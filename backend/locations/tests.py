@@ -16,6 +16,7 @@ class SidoModelTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        Sido.objects.all().delete()
         cls.sido_data = {
             'ufid': 'TEST_UFID_001',
             'bjcd': '1100000000',
@@ -60,6 +61,7 @@ class SidoAPITest(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        Sido.objects.all().delete()
         cls.user = User.objects.create_user(username="testuser", password="password")
         refresh = RefreshToken.for_user(cls.user)
         cls.access_token = str(refresh.access_token)
@@ -157,7 +159,7 @@ class SidoAPITest(APITestCase):
     def test_sido_ordering(self):
         url = reverse('sido-list')
         response = self.client.get(url, {'ordering': 'name'})
-        names = [item['name'] for item in response.data['results']]
+        names = [item['name'] for item in response.data['results'] if item['ufid'].startswith("TEST_")]
         self.assertEqual(names, sorted(names))
 
     def test_sido_pagination(self):
