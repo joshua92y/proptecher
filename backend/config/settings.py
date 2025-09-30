@@ -41,6 +41,7 @@ THIRD_PARTY_APPS = [
     "django_filters", # 필터링
     "taggit",  # 태그 기능
     'django_extensions', # 확장
+    "drf_spectacular", # 스웨거 UI
 ]
 
 REST_FRAMEWORK = {
@@ -53,6 +54,7 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend'
     ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 LOCAL_APPS = [
@@ -110,15 +112,36 @@ TEMPLATES = [
 # ============================================================================
 # 데이터베이스 설정
 # ============================================================================
+#DATABASES = {
+#   "default": {
+#        "ENGINE": "django.contrib.gis.db.backends.postgis",
+#        "NAME": "postgres",
+#        "USER": "postgres",
+#        "PASSWORD": "!!Yoon1992",
+#        "HOST": "34.64.52.68",
+#        "PORT": "5432",
+#    },
+#}
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
         "NAME": "postgres",
         "USER": "postgres",
-        "PASSWORD": "!!Yoon1992",
-        "HOST": "34.64.52.68",
+        "PASSWORD": "yoon1992",
+        "HOST": "localhost",
         "PORT": "5432",
-    },
+    }
+}
+
+# 캐시설정
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/0",  # Dragonfly 연결 주소
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
 }
 
 # 패스워드 검증
@@ -166,13 +189,7 @@ USE_TZ = True
 # 정적 파일 및 미디어 설정
 # ============================================================================
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
 STATIC_URL = "static/"
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

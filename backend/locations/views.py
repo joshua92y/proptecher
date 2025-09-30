@@ -1,84 +1,43 @@
 # backend/locations/views.py
 from rest_framework import viewsets, filters
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import AllowAny, IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q
-from django.db.models.signals import post_save, post_delete
-from django.dispatch import receiver
-
+from rest_framework.permissions import AllowAny
+from django.core.cache import cache
+from rest_framework_gis.filters import InBBoxFilter   # 🔹 추가
 from .models import Sido
-from .serializers import (
-    SidoSerializer,
-    SidoCreateSerializer,
-    SidoUpdateSerializer,
-)
-from .cache_utils import get_sido_data, refresh_sido_cache
+from .serializers import SidoSerializer
 
-
-@receiver([post_save, post_delete], sender=Sido)
-def clear_sido_cache(sender, **kwargs):
-    refresh_sido_cache()
-
-
-class SidoPagination(PageNumberPagination):
-    page_size = 20
-    page_size_query_param = "page_size"
-    max_page_size = 100
-
+CACHE_KEY = "sido_list_cache"
 
 class SidoViewSet(viewsets.ModelViewSet):
     queryset = Sido.objects.all()
     serializer_class = SidoSerializer
-    pagination_class = SidoPagination
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ["divi", "scls", "fmta"]
-    search_fields = ["name", "bjcd", "ufid"]
-    ordering_fields = ["name", "created_at", "updated_at"]
-    ordering = ["name"]
-    lookup_field = "ufid"
+    permission_classes = [AllowAny]
 
-    def get_permissions(self):
-        if self.action in ["list", "retrieve", "search", "stats"]:
-            return [AllowAny()]
-        return [IsAuthenticated()]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, InBBoxFilter]
+    bbox_filter_field = "geom"   # 🔹 필수 (bbox filtering 할 필드)
+    filterset_fields = ["bjcd"]
+    search_fields = ["name"]
 
-    def get_serializer_class(self):
-        if self.action == "create":
-            return SidoCreateSerializer
-        elif self.action in ["update", "partial_update"]:
-            return SidoUpdateSerializer
-        return SidoSerializer
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
-    @action(detail=False, methods=["get"])
-    def search(self, request):
-        query = request.query_params.get("q", "")
-        if not query:
-            return Response({"error": "검색어를 입력해주세요."}, status=400)
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        cache.delete(CACHE_KEY)
+        return response
 
-        queryset = self.get_queryset().filter(
-            Q(name__icontains=query) | Q(bjcd__icontains=query) | Q(ufid__icontains=query)
-        )
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        cache.delete(CACHE_KEY)
+        return response
 
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+    def partial_update(self, request, *args, **kwargs):
+        response = super().partial_update(request, *args, **kwargs)
+        cache.delete(CACHE_KEY)
+        return response
 
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
-    @action(detail=False, methods=["get"])
-    def stats(self, request):
-        total_count = self.get_queryset().count()
-        divi_stats = self.get_queryset().values("divi").distinct().count()
-
-        return Response(
-            {
-                "total_count": total_count,
-                "division_count": divi_stats,
-                "message": "시도 통계 정보",
-            }
-        )
+    def destroy(self, request, *args, **kwargs):
+        response = super().destroy(request, *args, **kwargs)
+        cache.delete(CACHE_KEY)
+        return response
