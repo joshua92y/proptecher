@@ -1,0 +1,35 @@
+# Django + Celery + PostGIS + Dragonfly + Mapshaper 기반 TopoJSON 생성 시스템
+# Core Django
+Django==5.2.6
+djangorestframework==3.16.1
+
+# GeoDjango (PostGIS)
+psycopg2-binary==2.9.10
+
+# Celery
+celery==5.4.0
+django-celery-beat==2.7.0
+django-celery-results==2.5.1
+
+# Dragonfly/Redis
+redis==5.2.1
+django-redis==5.4.0
+
+# Mapshaper는 Node.js 글로벌 설치로 처리 (Dockerfile에서)
+# topojson==1.5.1  # Mapshaper로 대체
+
+# 기타 유틸리티
+Pillow==11.0.0
+python-decouple==3.8
+
+# 개발 도구
+django-extensions==3.2.3
+django-filter==24.3
+drf-spectacular==0.28.0
+
+# WebSocket (선택사항)
+channels==4.2.0
+channels-redis==4.3.0
+
+# 태그 기능 (선택사항)
+django-taggit==6.1.0

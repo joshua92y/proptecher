@@ -44,6 +44,14 @@ THIRD_PARTY_APPS = [
     "drf_spectacular", # 스웨거 UI
 ]
 
+LOCAL_APPS = [
+    "locations",       # 지도 및 폴리곤 관리
+    "accounts",        # 계정 관리
+    "properties",      # 부동산 db 관리
+]
+
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -56,14 +64,6 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
-
-LOCAL_APPS = [
-    "locations",       # 지도 및 폴리곤 관리
-    "accounts",        # 계정 관리
-    "properties",      # 부동산 db 관리
-]
-
-INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 # 미들웨어 설정
 MIDDLEWARE = [
@@ -125,24 +125,53 @@ TEMPLATES = [
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": "postgres",
-        "USER": "postgres",
-        "PASSWORD": "yoon1992",
-        "HOST": "localhost",
-        "PORT": "5432",
+        "NAME": os.environ.get("DATABASE_NAME", "postgres"),
+        "USER": os.environ.get("DATABASE_USER", "postgres"),
+        "PASSWORD": os.environ.get("DATABASE_PASSWORD", "yoon1992"),
+        "HOST": os.environ.get("DATABASE_HOST", "localhost"),
+        "PORT": os.environ.get("DATABASE_PORT", "5432"),
     }
 }
 
-# 캐시설정
+# ============================================================================
+# Dragonfly 캐시 설정
+# ============================================================================
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379/0",  # Dragonfly 연결 주소
+        "LOCATION": f"redis://{os.environ.get('REDIS_HOST', '127.0.0.1')}:{os.environ.get('REDIS_PORT', '6379')}/0",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
     }
 }
+
+# ============================================================================
+# Celery 설정
+# ============================================================================
+
+# Celery 브로커 및 결과 백엔드 (Dragonfly 사용)
+CELERY_BROKER_URL = f"redis://{os.environ.get('REDIS_HOST', '127.0.0.1')}:{os.environ.get('REDIS_PORT', '6379')}/1"
+CELERY_RESULT_BACKEND = f"redis://{os.environ.get('REDIS_HOST', '127.0.0.1')}:{os.environ.get('REDIS_PORT', '6379')}/2"
+
+# Celery 설정
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "Asia/Seoul"
+CELERY_ENABLE_UTC = True
+
+# Task 설정
+CELERY_TASK_ALWAYS_EAGER = False  # 실제 비동기 실행
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30분
+CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25분
+
+# Worker 설정
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
 
 # 패스워드 검증
 AUTH_PASSWORD_VALIDATORS = [
@@ -166,7 +195,11 @@ AUTH_PASSWORD_VALIDATORS = [
 
 GDAL_LIBRARY_PATH=r"C:\Program Files\QGIS 3.40.11\bin\gdal311.dll"
 GEOS_LIBRARY_PATH=r"C:\Program Files\QGIS 3.40.11\bin\geos_c.dll"
-
+PROJ_LIB = r"C:\Program Files\QGIS 3.40.11\share\proj"
+PROJ_NETWORK = "OFF"
+PROJ_SKIP_READ_USER_WRITABLE_DIRECTORY = "YES"
+PROJ_CURL_ENABLED = "NO"
+PROJ_DEBUG = "0"
 # ============================================================================
 # 국제화 및 현지화 설정
 # ============================================================================
@@ -190,6 +223,14 @@ USE_TZ = True
 # ============================================================================
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
+
+# 미디어 파일 설정
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

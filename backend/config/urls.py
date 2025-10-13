@@ -6,6 +6,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 url = [
     path("admin/", admin.site.urls),
     path("api/locations/", include("locations.urls")),
+    path("api/topojson/", include("locations.urls")),  # TopoJSON API
 ]
 
 swagger_ui = [

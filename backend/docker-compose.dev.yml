@@ -1,0 +1,114 @@
+# backend/docker-compose.dev.yml
+# 개발용 Docker Compose 설정 (볼륨 마운트 포함)
+
+version: '3.8'
+
+services:
+  # PostgreSQL + PostGIS 데이터베이스
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: codelab_postgres_dev
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: yoon1992
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - codelab_dev_network
+
+  # Dragonfly 서버 (Redis 호환)
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+    container_name: codelab_dragonfly_dev
+    ports:
+      - "6379:6379"
+    command: ["--logtostderr", "--port=6379"]
+    networks:
+      - codelab_dev_network
+
+  # Django 웹 애플리케이션 (개발용 - 코드 변경 시 자동 반영)
+  web:
+    build: .
+    container_name: codelab_web_dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app  # 코드 변경 시 자동 반영
+      - static_dev_files:/app/staticfiles
+      - media_dev_files:/app/media
+    environment:
+      - DEBUG=True
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=postgres
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=yoon1992
+      - REDIS_HOST=dragonfly
+      - REDIS_PORT=6379
+    depends_on:
+      - postgres
+      - dragonfly
+    networks:
+      - codelab_dev_network
+    command: python manage.py runserver 0.0.0.0:8000
+
+  # Celery Worker (개발용)
+  celery_worker:
+    build: .
+    container_name: codelab_celery_worker_dev
+    command: celery -A config worker --loglevel=info --pool=solo --reload
+    volumes:
+      - .:/app  # 코드 변경 시 자동 반영
+      - static_dev_files:/app/staticfiles
+      - media_dev_files:/app/media
+    environment:
+      - DEBUG=True
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=postgres
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=yoon1992
+      - REDIS_HOST=dragonfly
+      - REDIS_PORT=6379
+    depends_on:
+      - postgres
+      - dragonfly
+    networks:
+      - codelab_dev_network
+
+  # Celery Flower (모니터링 도구)
+  celery_flower:
+    build: .
+    container_name: codelab_celery_flower_dev
+    command: celery -A config flower --port=5555
+    ports:
+      - "5555:5555"
+    volumes:
+      - .:/app
+    environment:
+      - DEBUG=True
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=postgres
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=yoon1992
+      - REDIS_HOST=dragonfly
+      - REDIS_PORT=6379
+    depends_on:
+      - postgres
+      - dragonfly
+    networks:
+      - codelab_dev_network
+
+volumes:
+  postgres_dev_data:
+  static_dev_files:
+  media_dev_files:
+
+networks:
+  codelab_dev_network:
+    driver: bridge
