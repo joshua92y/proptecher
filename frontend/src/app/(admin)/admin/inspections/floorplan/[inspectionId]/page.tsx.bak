@@ -1,0 +1,535 @@
+// 객체 개별 선택, 개별 모달창 완료
+
+"use client";
+
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Stage, Layer, Rect, Group, Text, Transformer } from "react-konva";
+import Konva from "konva";
+
+// ------------------------ Types ------------------------------
+type ID = string;
+
+type Zone = {
+  id: ID;
+  name: string;
+  areaM2: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  fill: string;
+};
+
+type ObjKind = "door" | "window" | "sink" | "fridge" | "sofa" | "desk";
+
+type FPObject = {
+  id: ID;
+  kind: ObjKind;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  fill: string;
+  zoneId?: ID;
+};
+
+type Selection = { type: "zone" | "object"; id: ID } | null;
+
+// ------------------------ Constants --------------------------
+const CANVAS_W = 360;
+const CANVAS_H = 560;
+const ZONE_COLOR = "#ffffff";
+const OBJ_COLOR = "#ffffff";
+const WALL = "#111111";
+const SCALE_PX_PER_M = 40;
+const SNAP_THRESHOLD = 8;
+
+const DEFAULT_OBJECT_SPECS: Record<ObjKind, { w: number; h: number }> = {
+  door:   { w: 0.9 * SCALE_PX_PER_M,  h: 2.1 * SCALE_PX_PER_M },
+  window: { w: 1.2 * SCALE_PX_PER_M,  h: 0.2 * SCALE_PX_PER_M },
+  sink:   { w: 1.0 * SCALE_PX_PER_M,  h: 0.6 * SCALE_PX_PER_M },
+  fridge: { w: 0.7 * SCALE_PX_PER_M,  h: 0.7 * SCALE_PX_PER_M },
+  sofa:   { w: 2.0 * SCALE_PX_PER_M,  h: 0.9 * SCALE_PX_PER_M },
+  desk:   { w: 1.2 * SCALE_PX_PER_M,  h: 0.6 * SCALE_PX_PER_M },
+};
+
+// ------------------------ Helpers ----------------------------
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+function areaToSquareWH(areaM2: number) {
+  const sideM = Math.sqrt(Math.max(1, areaM2));
+  const sidePx = sideM * SCALE_PX_PER_M;
+  return { w: sidePx, h: sidePx };
+}
+
+function rectEdges(x: number, y: number, w: number, h: number) {
+  return { left: x, right: x + w, top: y, bottom: y + h };
+}
+
+function snapToZones(
+  moving: { x: number; y: number; w: number; h: number },
+  zones: Zone[],
+  excludeId?: ID
+) {
+  let { x, y } = moving;
+  const m = rectEdges(x, y, moving.w, moving.h);
+
+  zones.forEach((z) => {
+    if (z.id === excludeId) return;
+    const e = rectEdges(z.x, z.y, z.width, z.height);
+    if (Math.abs(m.left - e.right) <= SNAP_THRESHOLD) x = e.right;
+    if (Math.abs(m.right - e.left) <= SNAP_THRESHOLD) x = e.left - moving.w;
+    if (Math.abs(m.left - e.left) <= SNAP_THRESHOLD) x = e.left;
+    if (Math.abs(m.right - e.right) <= SNAP_THRESHOLD) x = e.right - moving.w;
+    if (Math.abs(m.top - e.bottom) <= SNAP_THRESHOLD) y = e.bottom;
+    if (Math.abs(m.bottom - e.top) <= SNAP_THRESHOLD) y = e.top - moving.h;
+    if (Math.abs(m.top - e.top) <= SNAP_THRESHOLD) y = e.top;
+    if (Math.abs(m.bottom - e.bottom) <= SNAP_THRESHOLD) y = e.bottom - moving.h;
+  });
+
+  return { x, y };
+}
+
+function clampObjectInsideZone(obj: FPObject, zone?: Zone) {
+  if (!zone) return { x: obj.x, y: obj.y };
+  const grid = 10;
+  let x = Math.min(Math.max(obj.x, zone.x), zone.x + zone.width - obj.width);
+  let y = Math.min(Math.max(obj.y, zone.y), zone.y + zone.height - obj.height);
+  x = Math.round(x / grid) * grid;
+  y = Math.round(y / grid) * grid;
+  return { x, y };
+}
+
+function pointInZone(px: number, py: number, z: Zone) {
+  return px >= z.x && px <= z.x + z.width && py >= z.y && py <= z.y + z.height;
+}
+
+// ------------------------ Page -------------------------------
+export default function FloorplanPage() {
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [objects, setObjects] = useState<FPObject[]>([]);
+  const [selection, setSelection] = useState<Selection>(null);
+
+  const [showPalette, setShowPalette] = useState(false);
+  const [isZoneModalOpen, setZoneModalOpen] = useState(false);
+  const [zoneForm, setZoneForm] = useState({ name: "", areaM2: 0 });
+
+  const stageRef = useRef<Konva.Stage>(null);
+  const selectedTrRef = useRef<Konva.Transformer>(null);
+
+  const [tbPos, setTbPos] = useState<{ top: number; left: number } | null>(null);
+
+  // 항상 재선택되도록 공통 함수
+  const selectAndShow = (type: "zone" | "object", id: ID) => {
+    setSelection({ type, id });
+    requestAnimationFrame(() => positionPopover());
+  };
+
+  // 선택된 Konva 노드
+  const selectedKonvaNode = useMemo(() => {
+    if (!selection) return null;
+    const stage = stageRef.current;
+    if (!stage) return null;
+    const layer = stage.findOne("#layer-main") as Konva.Layer;
+    if (!layer) return null;
+    const node = layer.findOne(`#node-${selection.type}-${selection.id}`);
+    return node || null;
+  }, [selection]);
+
+  // Transformer + 위치 동기화
+  useEffect(() => {
+    const tr = selectedTrRef.current;
+    if (tr && selectedKonvaNode && selection) {
+      tr.nodes([selectedKonvaNode as any]);
+      tr.getLayer()?.batchDraw();
+      setTimeout(() => positionPopover(), 10);
+    } else if (tr) {
+      tr.nodes([]);
+      tr.getLayer()?.batchDraw();
+      setTbPos(null);
+    }
+  }, [selectedKonvaNode, selection]);
+
+  useEffect(() => {
+    if (selection) setTimeout(() => positionPopover(), 50);
+    else setTbPos(null);
+  }, [selection]);
+
+  useEffect(() => {
+    const onResize = () => positionPopover();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Delete" || e.key === "Backspace") handleDelete();
+      if (e.key === "Escape") setSelection(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selection]);
+
+  const positionPopover = () => {
+    if (!stageRef.current || !selectedKonvaNode || !selection) return;
+    try {
+      const rect = (selectedKonvaNode as any).getClientRect({ skipTransform: false });
+      const container = stageRef.current.container().getBoundingClientRect();
+      const left = container.left + rect.x + rect.width / 2;
+      const top = container.top + rect.y - 8;
+      setTbPos({ top, left });
+    } catch {
+      const container = stageRef.current.container().getBoundingClientRect();
+      setTbPos({ top: container.top + 100, left: container.left + container.width / 2 });
+    }
+  };
+
+  const handleDelete = () => {
+    if (!selection) return;
+    if (selection.type === "zone") setZones((zs) => zs.filter((z) => z.id !== selection.id));
+    else setObjects((os) => os.filter((o) => o.id !== selection.id));
+    setSelection(null);
+  };
+
+  const handleDuplicate = () => {
+    if (!selection) return;
+    if (selection.type === "zone") {
+      setZones((zs) => {
+        const z = zs.find((v) => v.id === selection.id)!;
+        const copy: Zone = { ...z, id: uid(), x: z.x + 12, y: z.y + 12 };
+        return [...zs, copy];
+      });
+    } else {
+      setObjects((os) => {
+        const o = os.find((v) => v.id === selection.id)!;
+        const copy: FPObject = { ...o, id: uid(), x: o.x + 12, y: o.y + 12 };
+        return [...os, copy];
+      });
+    }
+    requestAnimationFrame(() => positionPopover());
+  };
+
+  const addZone = () => {
+    if (!zoneForm.name.trim() || zoneForm.areaM2 <= 0) return;
+    const { w, h } = areaToSquareWH(zoneForm.areaM2);
+    const id = uid();
+    const z: Zone = {
+      id,
+      name: zoneForm.name.trim(),
+      areaM2: zoneForm.areaM2,
+      x: 40 + zones.length * 8,
+      y: 60 + zones.length * 8,
+      width: Math.round(w),
+      height: Math.round(h),
+      rotation: 0,
+      fill: ZONE_COLOR,
+    };
+    setZones((prev) => [...prev, z]);
+    setZoneModalOpen(false);
+    setZoneForm({ name: "", areaM2: 0 });
+    selectAndShow("zone", id); // 생성 직후 선택
+  };
+
+  const addObject = (kind: ObjKind) => {
+    const spec = DEFAULT_OBJECT_SPECS[kind];
+    const id = uid();
+    const center = { x: CANVAS_W / 2 - spec.w / 2, y: CANVAS_H / 2 - spec.h / 2 };
+    const host = zones.find((z) => pointInZone(center.x + spec.w / 2, center.y + spec.h / 2, z));
+    let pos = { x: center.x, y: center.y };
+    if (host) pos = clampObjectInsideZone(
+      { id: "tmp", kind, x: center.x, y: center.y, width: spec.w, height: spec.h, rotation: 0, fill: OBJ_COLOR },
+      host
+    );
+
+    const o: FPObject = {
+      id, kind, x: pos.x, y: pos.y,
+      width: Math.round(spec.w), height: Math.round(spec.h),
+      rotation: 0, fill: OBJ_COLOR, zoneId: host?.id
+    };
+    setObjects((prev) => [...prev, o]);
+    setShowPalette(false);
+    selectAndShow("object", id); // 생성 직후 선택
+  };
+
+  // ------------------------ Render ----------------------------
+  return (
+    <div className="shell">
+      {/* Header */}
+      <header className="header">
+        <button className="icon-btn" aria-label="back">←</button>
+        <div className="title">평면도 그리기</div>
+        <div className="header-actions">
+          <button className="chip">취소</button>
+          <button className="chip primary">저장</button>
+        </div>
+      </header>
+
+      {/* Canvas Card */}
+      <div className="card">
+        <div className="stage-wrap">
+          <Stage
+            ref={stageRef}
+            width={CANVAS_W}
+            height={CANVAS_H}
+            // ✅ 빈 공간 클릭 시에만 해제: onMouseDown만 사용
+            onMouseDown={(e) => {
+              if (e.target === e.target.getStage()) setSelection(null);
+            }}
+          >
+            <Layer id="layer-main" name="layer-main">
+              {/* 외벽 (클릭 무시) */}
+              <Rect
+                x={6}
+                y={6}
+                width={CANVAS_W - 12}
+                height={CANVAS_H - 12}
+                stroke={WALL}
+                strokeWidth={10}
+                cornerRadius={3}
+                listening={false}
+              />
+
+              {/* Zones */}
+              {zones.map((z) => (
+                <Group
+                  key={z.id}
+                  id={`node-zone-${z.id}`}
+                  x={z.x}
+                  y={z.y}
+                  rotation={z.rotation}
+                  draggable
+                  // ✅ 선택은 onMouseDown / onTap 에서 처리
+                  onMouseDown={(e) => { e.cancelBubble = true; selectAndShow("zone", z.id); }}
+                  onTap={(e) => { e.evt.preventDefault(); e.cancelBubble = true; selectAndShow("zone", z.id); }}
+                  onDragMove={(e) => {
+                    const node = e.target as Konva.Group;
+                    const pos = snapToZones({ x: node.x(), y: node.y(), w: z.width, h: z.height }, zones, z.id);
+                    node.x(pos.x); node.y(pos.y);
+                    positionPopover();
+                  }}
+                  onDragEnd={(e) => {
+                    const node = e.target as Konva.Group;
+                    const { x, y } = node.position();
+                    setZones((zs) => zs.map((it) => (it.id === z.id ? { ...it, x, y } : it)));
+                    positionPopover();
+                  }}
+                >
+                  <Rect
+                    width={z.width}
+                    height={z.height}
+                    stroke={selection?.type === "zone" && selection?.id === z.id ? "#7c3aed" : "#000"}
+                    strokeWidth={selection?.type === "zone" && selection?.id === z.id ? 4 : 3}
+                    fill={selection?.type === "zone" && selection?.id === z.id ? "#f3f4f6" : z.fill}
+                    cornerRadius={2}
+                  />
+                  <Text
+                    text={z.name}
+                    x={z.width / 2}
+                    y={z.height / 2}
+                    align="center"
+                    verticalAlign="middle"
+                    offsetX={z.name.length * 4}
+                    offsetY={8}
+                    fontSize={16}
+                    fill="#111"
+                    rotation={-z.rotation}
+                    listening={false}
+                  />
+                </Group>
+              ))}
+
+              {/* Objects */}
+              {objects.map((o) => (
+                <Group
+                  key={o.id}
+                  id={`node-object-${o.id}`}
+                  x={o.x}
+                  y={o.y}
+                  rotation={o.rotation}
+                  draggable
+                  onMouseDown={(e) => { e.cancelBubble = true; selectAndShow("object", o.id); }}
+                  onTap={(e) => { e.evt.preventDefault(); e.cancelBubble = true; selectAndShow("object", o.id); }}
+                  onDragMove={(e) => {
+                    const node = e.target as Konva.Group;
+                    const cx = node.x() + o.width / 2;
+                    const cy = node.y() + o.height / 2;
+                    const host = zones.find((z) => pointInZone(cx, cy, z));
+                    if (host) {
+                      const { x, y } = clampObjectInsideZone({ ...o, x: node.x(), y: node.y() }, host);
+                      node.x(x); node.y(y);
+                    }
+                    positionPopover();
+                  }}
+                  onDragEnd={(e) => {
+                    const node = e.target as Konva.Group;
+                    let x = node.x(); let y = node.y();
+                    const cx = x + o.width / 2; const cy = y + o.height / 2;
+                    const host = zones.find((z) => pointInZone(cx, cy, z));
+                    if (host) ({ x, y } = clampObjectInsideZone({ ...o, x, y }, host));
+                    setObjects((os) => os.map((it) => (it.id === o.id ? { ...it, x, y, zoneId: host?.id } : it)));
+                    positionPopover();
+                  }}
+                >
+                  <Rect
+                    width={o.width}
+                    height={o.height}
+                    fill={selection?.type === "object" && selection?.id === o.id ? "#f3f4f6" : o.fill}
+                    stroke={selection?.type === "object" && selection?.id === o.id ? "#7c3aed" : "#000"}
+                    strokeWidth={selection?.type === "object" && selection?.id === o.id ? 3 : 2}
+                    cornerRadius={3}
+                  />
+                  <Text
+                    text={o.kind}
+                    x={o.width / 2}
+                    y={o.height / 2}
+                    align="center"
+                    verticalAlign="middle"
+                    offsetX={o.kind.length * 3.5}
+                    offsetY={6}
+                    fontSize={12}
+                    fill="#111"
+                    rotation={-o.rotation}
+                    listening={false}
+                  />
+                </Group>
+              ))}
+
+              <Transformer
+                ref={selectedTrRef}
+                rotateEnabled={false}
+                anchorSize={8}
+                borderStroke="#6b21a8"
+                ignoreStroke={true}
+              />
+            </Layer>
+          </Stage>
+
+          {/* Action Modal */}
+          {selection && (
+            <div
+              className="action-modal"
+              style={{
+                top: tbPos?.top ?? 100,
+                left: tbPos?.left ?? 180,
+                transform: "translate(-50%, -100%)",
+              }}
+            >
+              <div className="action-title">
+                {selection.type === "zone"
+                  ? zones.find((z) => z.id === selection.id)?.name || "구역"
+                  : objects.find((o) => o.id === selection.id)?.kind || "오브젝트"}
+              </div>
+              <div className="action-row">
+                <button className="action-btn primary" onClick={handleDuplicate}>복제</button>
+                <button className="action-btn danger" onClick={handleDelete}>삭제</button>
+              </div>
+              <div className="action-hint">빈 영역을 클릭하면 선택이 해제돼요</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="footer">
+        <button className="btn" onClick={() => setShowPalette((v) => !v)}>오브젝트</button>
+        <button className="btn" onClick={() => setZoneModalOpen(true)}>구역 추가</button>
+      </footer>
+
+      {/* Palette */}
+      {showPalette && (
+        <aside className="palette">
+          {[
+            { label: "문", kind: "door" as ObjKind },
+            { label: "창문", kind: "window" as ObjKind },
+            { label: "싱크대", kind: "sink" as ObjKind },
+            { label: "가전", kind: "fridge" as ObjKind },
+            { label: "가구", kind: "sofa" as ObjKind },
+            { label: "기타", kind: "desk" as ObjKind },
+          ].map((it) => (
+            <button key={it.kind} className="palette-item" onClick={() => addObject(it.kind)}>
+              {it.label}
+            </button>
+          ))}
+        </aside>
+      )}
+
+      {/* Add Zone Modal */}
+      {isZoneModalOpen && (
+        <div className="overlay" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-title">구역명 / 면적</div>
+            <label className="field">
+              <span>구역명</span>
+              <input
+                placeholder="구역명"
+                value={zoneForm.name}
+                onChange={(e) => setZoneForm({ ...zoneForm, name: e.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span>면적</span>
+              <div className="input-suffix">
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={zoneForm.areaM2}
+                  min={0}
+                  onChange={(e) => setZoneForm({ ...zoneForm, areaM2: Number(e.target.value) })}
+                />
+                <em>m²</em>
+              </div>
+            </label>
+            <div className="modal-actions">
+              <button className="btn primary wide" onClick={addZone}>추가</button>
+              <button className="btn ghost wide" onClick={() => setZoneModalOpen(false)}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        .shell{min-height:100vh;background:#f5f5f7;display:flex;flex-direction:column;align-items:center;padding:12px}
+        .header{height:48px;display:flex;align-items:center;justify-content:space-between;gap:8px;width:360px}
+        .icon-btn{border:none;background:#fff;border-radius:10px;padding:6px 10px;box-shadow:0 0 0 1px #e5e7eb;cursor:pointer}
+        .title{font-weight:600}
+        .header-actions{display:flex;gap:8px}
+        .chip{border:1px solid #e5e7eb;background:#f9fafb;border-radius:10px;padding:6px 10px;font-size:12px}
+        .chip.primary{background:#7c3aed;color:#fff;border-color:#7c3aed}
+        .card{width:360px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:8px}
+        .stage-wrap{position:relative;display:flex;justify-content:center}
+        .footer{width:360px;display:flex;gap:12px;justify-content:space-between;margin-top:10px}
+        .btn{flex:1;border:1px solid #e5e7eb;background:#fff;border-radius:10px;padding:10px 12px;cursor:pointer}
+        .btn.primary{background:#7c3aed;color:#fff;border-color:#7c3aed}
+        .btn.ghost{background:#f9fafb}
+        .btn.wide{width:100%}
+
+        .palette{position:fixed;left:12px;top:80px;width:90px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:8px}
+        .palette-item{border:1px solid #e5e7eb;background:#f9fafb;border-radius:10px;padding:10px;cursor:pointer;text-align:left}
+
+        .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
+        .modal{width:300px;background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:14px;display:flex;flex-direction:column;gap:10px}
+        .modal-title{font-weight:600;margin-bottom:4px}
+        .field{display:flex;align-items:center;justify-content:space-between;gap:10px}
+        .field input{flex:1;border:1px solid #e5e7eb;border-radius:10px;padding:8px}
+        .input-suffix{display:flex;align-items:center;gap:6px;flex:1}
+        .input-suffix em{font-style:normal;color:#6b7280}
+        .modal-actions{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+
+        .action-modal{
+          position:fixed;z-index:30;min-width:180px;background:#fff;
+          border:1px solid #e5e7eb;border-radius:12px;padding:10px;
+          box-shadow:0 10px 24px rgba(0,0,0,.18);
+        }
+        .action-title{font-weight:600;font-size:14px;margin-bottom:8px;color:#111827}
+        .action-row{display:flex;gap:8px}
+        .action-btn{flex:1;height:36px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;cursor:pointer}
+        .action-btn.primary{background:#e7f0ff;border-color:#bfd3ff;color:#1d4ed8}
+        .action-btn.danger{background:#fff1f2;border-color:#fecdd3;color:#dc2626}
+        .action-btn:hover{filter:brightness(0.97)}
+        .action-hint{margin-top:6px;font-size:11px;color:#6b7280}
+      `}</style>
+    </div>
+  );
+}
