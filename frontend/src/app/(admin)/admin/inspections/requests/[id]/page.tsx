@@ -287,7 +287,7 @@ const Container = styled.div`
   min-height: 100vh;
   background: #f8f9fa;
   animation: ${fadeIn} 0.3s ease;
-  padding-bottom: 100px;
+  padding-bottom: 120px; /* 하단 네비게이션 바와 충분한 여백 확보 */
 `;
 
 const HeroImage = styled.img`
@@ -398,7 +398,7 @@ const ButtonGroup = styled.div`
   padding: 16px;
   background: white;
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.1);
-  z-index: 100;
+  z-index: 200; /* BottomNav(1000)보다 높은 값으로 설정 */
 `;
 
 const AcceptButton = styled.button`
