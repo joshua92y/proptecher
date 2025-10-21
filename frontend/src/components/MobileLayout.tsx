@@ -35,18 +35,18 @@ export default function MobileLayout({
 }
 
 const Container = styled.div`
-  display: flex;
-  flex-direction: column;
+  position: relative;
   min-height: 100vh;
   background: #fafafa;
 `;
 
 const Content = styled.main<{ $hasTopNav: boolean; $hasBottomNav: boolean }>`
-  flex: 1;
-  margin-top: ${(p) => (p.$hasTopNav ? "56px" : "0")};
-  margin-bottom: ${(p) => (p.$hasBottomNav ? "64px" : "0")};
+  position: relative;
+  min-height: 100vh;
+  padding-top: ${(p) => (p.$hasTopNav ? "56px" : "0")};
+  padding-bottom: ${(p) => (p.$hasBottomNav ? "64px" : "0")};
   overflow-y: auto;
   background: #fff;
-  transition: margin-top 0.3s ease;
+  transition: padding-top 0.3s ease;
 `;
 
