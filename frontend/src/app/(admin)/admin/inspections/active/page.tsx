@@ -1,401 +1,305 @@
-// src/app/(admin)/admin/inspections/active/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import styled from "styled-components";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { repo } from "@/lib/repos/inspections";
-import type { ActiveInspection } from "@/lib/repos/inspections";
+import { useRouter } from "next/navigation";
+import styled, { keyframes } from "styled-components";
+import MobileLayout from "@/components/MobileLayout";
+
+// 진행중인 임장 타입
+interface ActiveInspection {
+  id: string;
+  requestId: string;
+  title: string;
+  address: string;
+  priceText: string;
+  progress: number;
+  img: string | null;
+}
 
 export default function ActiveInspectionsPage() {
-  const sp = useSearchParams();
-  const acceptedId = sp.get("accepted") ?? undefined;
-
-  const [items, setItems] = useState<ActiveInspection[] | null>(null);
-
-  // 삭제(취소) 모달 상태
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [target, setTarget] = useState<ActiveInspection | null>(null);
-  const [reason, setReason] = useState("");
-  const [working, setWorking] = useState(false);
+  const router = useRouter();
+  const [inspections, setInspections] = useState<ActiveInspection[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let alive = true;
-    const sync = async () => {
-      const list = await repo.getActive();
-      if (alive) setItems(list);
+    const fetchActive = async () => {
+      try {
+        setLoading(true);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        
+        const response = await fetch(`${apiUrl}/api/admin/inspections/active`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setInspections(data.active || []);
+      } catch (error) {
+        console.error("진행중인 임장 로딩 실패:", error);
+        // Mock 데이터
+        setInspections([
+          {
+            id: "1",
+            requestId: "req1",
+            title: "서울 강남구 아파트",
+            address: "서울특별시 강남구 테헤란로 123",
+            priceText: "매매 10억원",
+            progress: 50,
+            img: null,
+          },
+          {
+            id: "2",
+            requestId: "req2",
+            title: "서울 송파구 오피스텔",
+            address: "서울특별시 송파구 올림픽로 345",
+            priceText: "전세 5억원",
+            progress: 25,
+            img: null,
+          },
+        ]);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    sync();
-    const off = repo.subscribe(sync);
-    return () => {
-      alive = false;
-      off?.();
-    };
+    fetchActive();
   }, []);
 
-  const isLoading = items === null;
-  const list = items ?? [];
-
-  const openConfirm = (it: ActiveInspection) => {
-    setTarget(it);
-    setReason("");
-    setConfirmOpen(true);
+  const goDetail = (id: string) => {
+    router.push(`/admin/inspections/active/${id}`);
   };
 
-  const closeConfirm = () => {
-    if (working) return;
-    setConfirmOpen(false);
-    setTarget(null);
-    setReason("");
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!target) return;
-    try {
-      setWorking(true);
-      await repo.cancelActive(target.id, { reason, requeue: true });
-      setWorking(false);
-      closeConfirm();
-    } catch {
-      setWorking(false);
-      alert("삭제 처리 중 문제가 발생했어요.");
-    }
+  const getProgressColor = (progress: number) => {
+    if (progress < 26) return "#FF6B6B";
+    if (progress < 51) return "#FFA94D";
+    if (progress < 76) return "#FFD43B";
+    return "#51CF66";
   };
 
   return (
-    <Wrap>
-      <Header>
-        <H1>진행중인 임장</H1>
-      </Header>
+    <MobileLayout>
+      <Container>
+        <Header>
+          <Title>🔄 진행중인 임장</Title>
+          <Count>{inspections.length}건</Count>
+        </Header>
 
-      {isLoading ? (
-        <Empty>불러오는 중…</Empty>
-      ) : list.length === 0 ? (
-        <Empty>진행중인 임장이 없습니다.</Empty>
-      ) : (
-        <List>
-          {list.map((it) => {
-            const isJustAccepted = acceptedId === it.id;
-            return (
-              <Card key={it.id} $pulse={!!isJustAccepted}>
-                {/* 우상단 삭제(취소) 버튼 */}
-                <DeleteBtn
-                  aria-label="임장 취소"
-                  title="임장 취소"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openConfirm(it);
-                  }}
-                >
-                  🗑️
-                </DeleteBtn>
-
-                {/* 상단: 왼쪽에 몰아서 (제목 + 임장비 + 최근수락) */}
-                <LeftTop>
-                  <Title>{it.title}</Title>
-                  <PriceChip>{it.priceText}</PriceChip>
-                  {isJustAccepted && <NewBadge>최근 수락됨</NewBadge>}
-                </LeftTop>
-
-                <Addr>📍 {it.address}</Addr>
-
-                {/* 진행률 */}
-                <ProgressRow>
-                  <ProgressLabel>진행률</ProgressLabel>
-                  <Percent>{it.progress}%</Percent>
-                </ProgressRow>
-                <ProgressBar>
-                  <ProgressFill
-                    style={{ width: `${Math.min(100, Math.max(0, it.progress))}%` }}
-                  />
-                </ProgressBar>
-
-                {/* 액션 버튼: 상세보기 / 진행현황 */}
-                <ActionRow>
-                  <ActionGhostLink
-                    href={`/admin/inspections/${encodeURIComponent(it.requestId)}?readonly=1`}
-                  >
-                    상세 보기
-                  </ActionGhostLink>
-
-                  <ActionPrimaryLink
-                    href={`/admin/inspections/progress/${encodeURIComponent(it.id)}`}
-                  >
-                    진행현황
-                  </ActionPrimaryLink>
-                </ActionRow>
+        <Content>
+          {loading ? (
+            <EmptyState>로딩 중...</EmptyState>
+          ) : inspections.length === 0 ? (
+            <EmptyState>
+              <EmptyIcon>📋</EmptyIcon>
+              <EmptyText>진행중인 임장이 없습니다</EmptyText>
+              <EmptySubText>요청을 수락하면 여기에 표시됩니다</EmptySubText>
+            </EmptyState>
+          ) : (
+            inspections.map((inspection) => (
+              <Card key={inspection.id} onClick={() => goDetail(inspection.id)}>
+                <Thumb src={inspection.img || "/images/placeholder.jpg"} alt={inspection.title} />
+                <CardInfo>
+                  <CardTitle>{inspection.title}</CardTitle>
+                  <CardAddress>{inspection.address}</CardAddress>
+                  <CardPrice>{inspection.priceText}</CardPrice>
+                  
+                  <ProgressSection>
+                    <ProgressLabel>
+                      <span>진행률</span>
+                      <ProgressPercent $color={getProgressColor(inspection.progress)}>
+                        {inspection.progress}%
+                      </ProgressPercent>
+                    </ProgressLabel>
+                    <ProgressBar>
+                      <ProgressFill 
+                        $progress={inspection.progress} 
+                        $color={getProgressColor(inspection.progress)}
+                      />
+                    </ProgressBar>
+                  </ProgressSection>
+                </CardInfo>
               </Card>
-            );
-          })}
-        </List>
-      )}
-
-      {/* 확인 모달 */}
-      {confirmOpen && (
-        <ModalBackdrop onClick={closeConfirm}>
-          <ModalCard onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>임장 취소</ModalTitle>
-              <ModalClose onClick={closeConfirm}>✕</ModalClose>
-            </ModalHeader>
-
-            <ModalBody>
-              <Textarea
-                placeholder="취소 사유를 입력해주세요.."
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                rows={5}
-              />
-              <SmallNote>* 임장 3회 취소 시 패널티가 부과될 수 있습니다.</SmallNote>
-            </ModalBody>
-
-            <ModalActions>
-              <BtnGhost onClick={closeConfirm} disabled={working}>
-                취소
-              </BtnGhost>
-              <BtnPrimary onClick={handleConfirmDelete} disabled={working}>
-                {working ? "처리 중…" : "확인"}
-              </BtnPrimary>
-            </ModalActions>
-          </ModalCard>
-        </ModalBackdrop>
-      )}
-    </Wrap>
+            ))
+          )}
+        </Content>
+      </Container>
+    </MobileLayout>
   );
 }
 
-/* ───────── styled ───────── */
-const Wrap = styled.div``;
+// Styled Components
+const fadeIn = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
+`;
+
+const slideUp = keyframes`
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
+
+const Container = styled.div`
+  min-height: 100vh;
+  background: #f8f9fa;
+  animation: ${fadeIn} 0.3s ease;
+`;
 
 const Header = styled.div`
-  padding: 12px;
+  background: white;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 `;
-const H1 = styled.h1`
-  font-size: 16px;
+
+const Title = styled.h1`
+  font-size: 22px;
+  font-weight: 700;
+  color: #333;
   margin: 0;
 `;
 
-const Empty = styled.div`
-  padding: 24px;
-  color: #888;
+const Count = styled.span`
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 600;
+`;
+
+const Content = styled.div`
+  padding: 16px;
+  animation: ${slideUp} 0.4s ease;
+`;
+
+const Card = styled.div`
+  background: white;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  gap: 16px;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  }
+
+  &:active {
+    transform: translateY(-2px);
+  }
+`;
+
+const Thumb = styled.img`
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 12px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+`;
+
+const CardInfo = styled.div`
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+const CardTitle = styled.h3`
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const CardAddress = styled.p`
+  font-size: 13px;
+  color: #666;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const CardPrice = styled.p`
+  font-size: 14px;
+  color: #667eea;
+  font-weight: 600;
+  margin: 0;
+`;
+
+const ProgressSection = styled.div`
+  margin-top: 8px;
+`;
+
+const ProgressLabel = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+
+  span {
+    font-size: 12px;
+    color: #999;
+  }
+`;
+
+const ProgressPercent = styled.span<{ $color: string }>`
+  font-size: 14px;
+  font-weight: 700;
+  color: ${(props) => props.$color} !important;
+`;
+
+const ProgressBar = styled.div`
+  width: 100%;
+  height: 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+`;
+
+const ProgressFill = styled.div<{ $progress: number; $color: string }>`
+  width: ${(props) => props.$progress}%;
+  height: 100%;
+  background: ${(props) => props.$color};
+  transition: width 0.3s ease, background 0.3s ease;
+  border-radius: 4px;
+`;
+
+const EmptyState = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
   text-align: center;
 `;
 
-const List = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 0 12px 12px;
+const EmptyIcon = styled.div`
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
 `;
 
-const Card = styled.div<{ $pulse?: boolean }>`
-  position: relative;
-  background: #fff;
-  border: 1px solid #eee;
-  border-radius: 12px;
-  padding: 12px;
-  /* 휴지통 자리 확보(겹침 방지) */
-  padding-right: 48px;
-
-  ${(p) =>
-    p.$pulse &&
-    `
-    box-shadow: 0 0 0 0 rgba(123,63,228,0.35);
-    animation: pulse 1.4s ease-out 2;
-    @keyframes pulse {
-      0%   { box-shadow: 0 0 0 0 rgba(123,63,228,0.4); }
-      100% { box-shadow: 0 0 0 14px rgba(123,63,228,0); }
-    }
-  `}
-`;
-
-const DeleteBtn = styled.button`
-  position: absolute;
-  right: 10px;
-  top: 10px;
-  border: none;
-  background: transparent;
-  font-size: 16px;
-  cursor: pointer;
-  line-height: 1;
-  color: #9aa0a6;
-`;
-
-const LeftTop = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap; /* 좁을 때 줄바꿈 */
-  justify-content: flex-start; /* 왼쪽 정렬 */
-`;
-
-const Title = styled.div`
-  font-weight: 700;
-  /* 왼쪽에 붙여 두기 위해 flex 확장 제거 */
-  /* 긴 제목이 칩을 밀지 않도록 약간의 여유만 */
-  max-width: 100%;
-`;
-
-const PriceChip = styled.span`
-  font-size: 12px;
-  background: #f1e6ff;
-  color: #7b3fe4;
-  border-radius: 999px;
-  padding: 3px 8px;
-`;
-
-const NewBadge = styled.span`
-  font-size: 10px;
-  background: #7b3fe4;
-  color: #fff;
-  border-radius: 999px;
-  padding: 2px 6px;
-`;
-
-const Addr = styled.div`
-  color: #666;
-  font-size: 13px;
-  margin-top: 4px;
-`;
-
-const ProgressRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
-  color: #555;
-  font-size: 12px;
-`;
-const ProgressLabel = styled.span``;
-const Percent = styled.span``;
-
-const ProgressBar = styled.div`
-  height: 8px;
-  margin-top: 4px;
-  background: #eee;
-  border-radius: 999px;
-  overflow: hidden;
-`;
-const ProgressFill = styled.div`
-  height: 100%;
-  background: #7b3fe4;
-`;
-
-const ActionRow = styled.div`
-  display: flex;
-  gap: 10px;
-  margin-top: 12px;
-`;
-const ActionGhost = styled.a`
-  flex: 1;
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #ccc;
-  background: #fff;
-  border-radius: 10px;
-  text-decoration: none;
-  color: inherit;
-`;
-const ActionPrimary = styled.a`
-  flex: 1;
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: #7b3fe4;
-  color: #fff;
-  border-radius: 10px;
-  text-decoration: none;
-`;
-
-/* ——— modal ——— */
-const ModalBackdrop = styled.div`
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-`;
-const ModalCard = styled.div`
-  width: min(520px, calc(100% - 32px));
-  background: #fff;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 10px 24px rgba(0,0,0,0.12);
-`;
-const ModalHeader = styled.div`
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #eee;
-`;
-const ModalTitle = styled.div`
-  font-weight: 700;
-  font-size: 16px;
-  flex: 1;
-`;
-const ModalClose = styled.button`
-  border: none;
-  background: transparent;
+const EmptyText = styled.p`
   font-size: 18px;
-  cursor: pointer;
+  font-weight: 600;
+  color: #666;
+  margin: 0 0 8px 0;
 `;
-const ModalBody = styled.div`
-  padding: 12px 16px;
-`;
-const Textarea = styled.textarea`
-  width: 100%;
-  min-height: 100px;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  padding: 10px;
-  resize: vertical;
-`;
-const SmallNote = styled.div`
+
+const EmptySubText = styled.p`
+  font-size: 14px;
   color: #999;
-  font-size: 12px;
-  margin-top: 8px;
-`;
-const ModalActions = styled.div`
-  display: flex;
-  gap: 10px;
-  padding: 12px 16px 16px;
-`;
-const BtnGhost = styled.button`
-  flex: 1;
-  height: 42px;
-  border: 1px solid #ccc;
-  background: #fff;
-  border-radius: 10px;
-`;
-const BtnPrimary = styled.button`
-  flex: 1;
-  height: 42px;
-  border: none;
-  background: #7b3fe4;
-  color: #fff;
-  border-radius: 10px;
-`;
-
-const baseButtonCss = `
-  flex:1; height:40px; border-radius:12px;
-  display:flex; align-items:center; justify-content:center;
-  text-decoration:none; font-weight:700;
-`;
-
-const ActionGhostLink = styled(Link)`
-  ${baseButtonCss}
-  border:1px solid #ccc; background:#fff; color:#111;
-`;
-
-const ActionPrimaryLink = styled(Link)`
-  ${baseButtonCss}
-  border:none; background:#7b3fe4; color:#fff;
+  margin: 0;
 `;

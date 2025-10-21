@@ -296,3 +296,8 @@ docker-compose -f docker-compose.dev.yml exec web python create_test_listings.py
 
 **다음 단계**: Inspection API 개발 (BACKEND_DEVELOPMENT_WORKFLOW.md Phase 3 참조)
 
+
+
+
+
+

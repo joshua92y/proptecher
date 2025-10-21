@@ -1,131 +1,288 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import styled from "styled-components";
-import { repo, type RequestCard } from "@/lib/repos/inspections";
-
-type Notice = { id: string; title: string; date: string; isNew?: boolean; href?: string; };
-
-const NOTICES: Notice[] = [
-  { id: "n1", title: "12개월 평가 수수료 인상 안내", date: "2025.09.27", isNew: true },
-  { id: "n2", title: "연말 정산 서류 제출 기한 안내", date: "2025.09.27" },
-  { id: "n3", title: "불편한 업데이트 및 새로운 기능 소개", date: "2025.09.27" },
-  { id: "n4", title: "평가사 교육 프로그램 신청 안내", date: "2025.09.27" },
-];
+import { useRouter } from "next/navigation";
+import styled, { keyframes } from "styled-components";
+import MobileLayout from "@/components/MobileLayout";
 
 export default function AdminDashboardPage() {
-  const [requests, setRequests] = useState<RequestCard[]>([]);
-  const [activeCount, setActiveCount] = useState(0);
+  const router = useRouter();
 
-  useEffect(() => {
-    let alive = true;
-    const sync = async () => {
-      const [reqs, active] = await Promise.all([repo.getRequests(), repo.getActive()]);
-      if (!alive) return;
-      setRequests(reqs);
-      setActiveCount(active.length);
-    };
-    sync();
-    const off = repo.subscribe(sync);
-    return () => { alive = false; off?.(); };
-  }, []);
-
-  const requestCount = requests.length;
+  const features = [
+    {
+      icon: "📋",
+      title: "임장 요청",
+      description: "새로운 임장 요청 확인",
+      count: 5,
+      path: "/admin/inspections",
+      gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    },
+    {
+      icon: "🔄",
+      title: "진행중",
+      description: "진행중인 임장 관리",
+      count: 3,
+      path: "/admin/inspections/active",
+      gradient: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+    },
+    {
+      icon: "✅",
+      title: "완료",
+      description: "완료된 임장 내역",
+      count: 12,
+      path: "/admin/inspections/completed",
+      gradient: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+    },
+    {
+      icon: "📊",
+      title: "통계",
+      description: "임장 통계 및 분석",
+      count: null,
+      path: "/admin/stats",
+      gradient: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
+    },
+  ];
 
   return (
-    <>
-      {/* 프로필 카드 */}
-      <Card>
-        <Row>
-          <Avatar />
-          <Col>
-            <Name>홍길동</Name>
-            <MetaRow><Star>★</Star><span>4.8</span><Dot>·</Dot><Small>127건 완료</Small></MetaRow>
-            <Small>인천시 동남구  ·  경력 3년</Small>
-          </Col>
-        </Row>
-      </Card>
+    <MobileLayout>
+      <Container>
+        <Header>
+          <Greeting>
+            <GreetingIcon>👋</GreetingIcon>
+            <div>
+              <GreetingText>안녕하세요!</GreetingText>
+              <GreetingSubText>평가사 대시보드</GreetingSubText>
+            </div>
+          </Greeting>
+        </Header>
 
-      {/* 매물 임장 요청 */}
-      <SectionHeader>
-        <SectionTitle>매물 임장 요청</SectionTitle>
-        <Badge>{requestCount}</Badge>
-      </SectionHeader>
+        <Content>
+          <Section>
+            <SectionTitle>빠른 메뉴</SectionTitle>
+            <FeatureGrid>
+              {features.map((feature, idx) => (
+                <FeatureCard
+                  key={idx}
+                  onClick={() => router.push(feature.path)}
+                  $gradient={feature.gradient}
+                >
+                  <FeatureIcon>{feature.icon}</FeatureIcon>
+                  <FeatureTitle>{feature.title}</FeatureTitle>
+                  <FeatureDescription>{feature.description}</FeatureDescription>
+                  {feature.count !== null && <FeatureCount>{feature.count}건</FeatureCount>}
+                </FeatureCard>
+              ))}
+            </FeatureGrid>
+          </Section>
 
-      <List>
-        {requestCount === 0 ? (
-          <Empty>현재 접수된 임장 요청이 없습니다.</Empty>
-        ) : (
-          requests.map((r) => (
-            <Item key={r.id} href={`/admin/inspections/${encodeURIComponent(r.id)}`}>
-              <Thumb>{r.img && <Image src={r.img} alt="" fill style={{ objectFit: "cover" }} />}</Thumb>
-              <ItemBody>
-                <ItemTitle>{r.title}</ItemTitle>
-                <Line><Pin>📍</Pin><span>{r.address}</span></Line>
-                <Price>{r.priceText}</Price>
-              </ItemBody>
-            </Item>
-          ))
-        )}
-      </List>
-
-      {/* 진행중인 임장 */}
-      <SectionHeader style={{ marginTop: 20 }}>
-        <SectionTitle>진행중인 임장</SectionTitle>
-        <Badge>{activeCount}</Badge>
-      </SectionHeader>
-      <PrimaryButton as={Link} href="/admin/inspections/active">진행중인 임장 보기</PrimaryButton>
-
-      {/* 공지사항 */}
-      <SectionHeader style={{ marginTop: 24 }}>
-        <SectionTitle>공지사항</SectionTitle>
-      </SectionHeader>
-      <Card>
-        {NOTICES.map((n, i) => (
-          <NoticeRow key={n.id} href={n.href ?? "#"}>
-            <NoticeTitle>{n.title}{n.isNew && <NoticeNew>N</NoticeNew>}</NoticeTitle>
-            <NoticeMeta>{n.date}</NoticeMeta>
-            <Chevron>›</Chevron>
-            {i < NOTICES.length - 1 && <Divider />}
-          </NoticeRow>
-        ))}
-        <AllNotice href="#">전체 공지사항 보기</AllNotice>
-      </Card>
-    </>
+          <Section>
+            <SectionTitle>최근 활동</SectionTitle>
+            <ActivityList>
+              <ActivityItem>
+                <ActivityIcon>📋</ActivityIcon>
+                <ActivityContent>
+                  <ActivityTitle>새로운 임장 요청</ActivityTitle>
+                  <ActivityTime>5분 전</ActivityTime>
+                </ActivityContent>
+              </ActivityItem>
+              <ActivityItem>
+                <ActivityIcon>✅</ActivityIcon>
+                <ActivityContent>
+                  <ActivityTitle>임장 완료 처리</ActivityTitle>
+                  <ActivityTime>1시간 전</ActivityTime>
+                </ActivityContent>
+              </ActivityItem>
+              <ActivityItem>
+                <ActivityIcon>🔄</ActivityIcon>
+                <ActivityContent>
+                  <ActivityTitle>진행률 업데이트</ActivityTitle>
+                  <ActivityTime>2시간 전</ActivityTime>
+                </ActivityContent>
+              </ActivityItem>
+            </ActivityList>
+          </Section>
+        </Content>
+      </Container>
+    </MobileLayout>
   );
 }
 
-/* styled */
-const Card = styled.div`background:#fff;border:1px solid #eee;border-radius:12px;padding:12px;margin:12px;`;
-const Row = styled.div`display:flex;gap:12px;align-items:center;`;
-const Col = styled.div`display:flex;flex-direction:column;gap:4px;`;
-const Avatar = styled.div`width:42px;height:42px;border-radius:50%;background:#ddd;`;
-const Name = styled.div`font-weight:700;`;
-const MetaRow = styled.div`display:flex;align-items:center;gap:6px;color:#666;`;
-const Star = styled.span`color:#f6b100;`;
-const Dot = styled.span`color:#aaa;`;
-const Small = styled.span`font-size:12px;color:#777;`;
+// Styled Components
+const fadeIn = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
+`;
 
-const SectionHeader = styled.div`display:flex;align-items:center;justify-content:space-between;padding:0 12px;margin-top:12px;`;
-const SectionTitle = styled.h2`font-size:14px;margin:0;`;
-const Badge = styled.span`background:#eee;border-radius:999px;padding:2px 8px;font-size:12px;`;
+const slideUp = keyframes`
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
 
-const List = styled.div`display:flex;flex-direction:column;gap:10px;padding:0 12px;`;
-const Empty = styled.div`padding:24px;color:#888;text-align:center;`;
-const Item = styled(Link)`display:flex;gap:10px;align-items:center;background:#fff;border:1px solid #eee;border-radius:12px;padding:8px 10px;`;
-const Thumb = styled.div`position:relative;width:64px;height:48px;border-radius:8px;overflow:hidden;background:#f5f5f5;`;
-const ItemBody = styled.div`flex:1;`;
-const ItemTitle = styled.div`font-weight:700;`;
-const Line = styled.div`display:flex;gap:6px;color:#666;align-items:center;`;
-const Pin = styled.span``;
-const Price = styled.div`font-weight:700;margin-top:4px;`;
-const PrimaryButton = styled.a`display:block;margin:12px;background:#7b3fe4;color:#fff;text-align:center;padding:12px;border-radius:12px;`;
-const NoticeRow = styled.a`position:relative;display:flex;align-items:center;gap:10px;padding:10px 4px;color:inherit;text-decoration:none;`;
-const NoticeTitle = styled.div`flex:1;`;
-const NoticeNew = styled.span`margin-left:6px;background:#ff4d4f;color:#fff;border-radius:999px;padding:2px 6px;font-size:10px;`;
-const NoticeMeta = styled.div`color:#888;font-size:12px;`;
-const Chevron = styled.div`color:#bbb;`;
-const Divider = styled.div`position:absolute;left:0;right:0;bottom:0;height:1px;background:#eee;`;
-const AllNotice = styled.a`display:block;text-align:center;padding:10px 0;margin-top:4px;color:#7b3fe4;`;
+const float = keyframes`
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+`;
+
+const Container = styled.div`
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f8f9ff 0%, #f8f9fa 100%);
+  animation: ${fadeIn} 0.3s ease;
+`;
+
+const Header = styled.div`
+  background: white;
+  padding: 24px 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+`;
+
+const Greeting = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 16px;
+`;
+
+const GreetingIcon = styled.div`
+  font-size: 48px;
+  animation: ${float} 3s ease-in-out infinite;
+`;
+
+const GreetingText = styled.h1`
+  font-size: 24px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 4px 0;
+`;
+
+const GreetingSubText = styled.p`
+  font-size: 14px;
+  color: #999;
+  margin: 0;
+`;
+
+const Content = styled.div`
+  padding: 20px;
+  animation: ${slideUp} 0.4s ease;
+`;
+
+const Section = styled.section`
+  margin-bottom: 32px;
+`;
+
+const SectionTitle = styled.h2`
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+`;
+
+const FeatureGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+`;
+
+const FeatureCard = styled.div<{ $gradient: string }>`
+  background: ${(props) => props.$gradient};
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.1);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  &:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+
+    &::before {
+      opacity: 1;
+    }
+  }
+
+  &:active {
+    transform: translateY(-2px) scale(1.01);
+  }
+`;
+
+const FeatureIcon = styled.div`
+  font-size: 36px;
+  margin-bottom: 12px;
+`;
+
+const FeatureTitle = styled.h3`
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 6px 0;
+`;
+
+const FeatureDescription = styled.p`
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  flex: 1;
+`;
+
+const FeatureCount = styled.div`
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  margin-top: 12px;
+  text-align: right;
+`;
+
+const ActivityList = styled.div`
+  background: white;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+`;
+
+const ActivityItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const ActivityIcon = styled.div`
+  font-size: 24px;
+  flex-shrink: 0;
+`;
+
+const ActivityContent = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const ActivityTitle = styled.p`
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin: 0 0 4px 0;
+`;
+
+const ActivityTime = styled.p`
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+`;

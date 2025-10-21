@@ -91,15 +91,25 @@ export default function KakaoMap({
     const initMap = () => {
       console.log("KakaoMap: Initializing map...");
       console.log("KakaoMap: window.kakao exists?", !!window.kakao);
-      
+      console.log("KakaoMap: window.kakao.maps exists?", !!window.kakao?.maps);
+      console.log("KakaoMap: Script src should be loaded");
+
+      // SDK 로딩 대기
       if (!window.kakao || !window.kakao.maps) {
-        console.error("❌ Kakao Maps SDK가 로드되지 않았습니다.");
-        console.log("Tip: .env.local 파일과 Next.js 서버 재시작을 확인하세요.");
+        console.error("❌ Kakao Maps SDK가 아직 로드되지 않았습니다. 재시도 중...");
+        setTimeout(() => {
+          if (!window.kakao || !window.kakao.maps) {
+            console.error("❌ Kakao Maps SDK 로드 실패. .env.local 파일을 확인하세요.");
+            console.log("환경변수 확인:", process.env.NEXT_PUBLIC_KAKAO_MAP_APP_KEY);
+            return;
+          }
+          initMap(); // 재시도
+        }, 1000);
         return;
       }
 
       console.log("✅ Kakao Maps SDK loaded successfully");
-      
+
       window.kakao.maps.load(() => {
         console.log("KakaoMap: kakao.maps.load() callback called");
         const container = mapContainerRef.current;

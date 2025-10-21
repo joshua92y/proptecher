@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('agents', '0001_initial'),
-        ('regions', '0001_initial'),
+        ('locations', '0001_initial'),
         ('users', '0001_initial'),
     ]
 
@@ -62,7 +62,7 @@ class Migration(migrations.Migration):
                 ('수정일시', models.DateTimeField(auto_now=True, verbose_name='수정 일시')),
                 ('관리중개사ID', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='managed_listings', to='agents.agent', verbose_name='관리 중개사')),
                 ('등록사용자ID', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='registered_listings', to='users.userprofile', verbose_name='등록한 사용자 프로필')),
-                ('지역ID', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='regions.region', verbose_name='지역 정보')),
+                ('지역ID', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='locations.region', verbose_name='지역 정보')),
             ],
             options={
                 'verbose_name': '매물',

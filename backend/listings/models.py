@@ -45,7 +45,7 @@ class Listing(models.Model):
         verbose_name='관리 중개사'
     )
     지역ID = models.ForeignKey(
-        'regions.Region',
+        'locations.Region',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -322,6 +322,53 @@ class Listing(models.Model):
     활성화여부 = models.BooleanField(
         default=True,
         verbose_name='활성화 여부'
+    )
+
+    # 교통 정보 (JSON 필드로 저장)
+    대중교통점수 = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name='대중교통 편의성 점수(0-10)'
+    )
+    노선다양성점수 = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name='노선 다양성 점수(0-5)'
+    )
+    버스정류장정보 = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='버스 정류장 정보'
+    )
+    # 예시: [{"stop_name": "선릉역", "distance_m": 180, "bus_numbers": ["146", "341"]}]
+
+    지하철역정보 = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='지하철역 정보'
+    )
+    # 예시: [{"station_name": "선릉역", "line_names": ["2호선"], "distance_m": 420}]
+
+    # 편의시설 정보
+    편의시설요약 = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name='편의시설 및 상권 요약'
+    )
+
+    # 이미지 (JSONField로 여러 이미지 URL 저장)
+    이미지URLs = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='매물 이미지 URL 목록'
+    )
+    # 예시: ["/images/house1.jpg", "/images/house2.jpg"]
+
+    # Q&A (별도 모델로 분리하는 것이 권장)
+    QA정보 = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='Q&A 정보'
     )
 
     # 타임스탬프
