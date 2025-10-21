@@ -25,18 +25,12 @@ export default function ActiveInspectionsPage() {
     const fetchActive = async () => {
       try {
         setLoading(true);
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         
-        const response = await fetch(`${apiUrl}/api/admin/inspections/active`);
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        setInspections(data.active || []);
-      } catch (error) {
-        console.error("진행중인 임장 로딩 실패:", error);
+        // 개발 중: Mock 데이터 사용 (인증 구현 후 API 연동)
+        console.log("🔄 진행중인 임장 로딩 (Mock 데이터)");
+        
+        await new Promise(resolve => setTimeout(resolve, 400)); // 로딩 시뮬레이션
+        
         // Mock 데이터
         setInspections([
           {
@@ -46,7 +40,7 @@ export default function ActiveInspectionsPage() {
             address: "서울특별시 강남구 테헤란로 123",
             priceText: "매매 10억원",
             progress: 50,
-            img: null,
+            img: "/images/apartment-1.jpg",
           },
           {
             id: "2",
@@ -55,9 +49,31 @@ export default function ActiveInspectionsPage() {
             address: "서울특별시 송파구 올림픽로 345",
             priceText: "전세 5억원",
             progress: 25,
-            img: null,
+            img: "/images/officetel-1.jpg",
+          },
+          {
+            id: "3",
+            requestId: "req3",
+            title: "서울 서초구 빌라",
+            address: "서울특별시 서초구 서초대로 456",
+            priceText: "월세 500/50만원",
+            progress: 75,
+            img: "/images/villa-1.jpg",
           },
         ]);
+        
+        // TODO: 실제 API 연동 (인증 구현 후)
+        // const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        // const response = await fetch(`${apiUrl}/api/admin/inspections/active`, {
+        //   headers: {
+        //     'Authorization': `Bearer ${token}`,
+        //   },
+        // });
+        // const data = await response.json();
+        // setInspections(data.active || []);
+        
+      } catch (error) {
+        console.error("진행중인 임장 로딩 실패:", error);
       } finally {
         setLoading(false);
       }
@@ -97,7 +113,15 @@ export default function ActiveInspectionsPage() {
           ) : (
             inspections.map((inspection) => (
               <Card key={inspection.id} onClick={() => goDetail(inspection.id)}>
-                <Thumb src={inspection.img || "/images/placeholder.jpg"} alt={inspection.title} />
+                <Thumb 
+                  src={inspection.img || "/images/apartment-1.jpg"} 
+                  alt={inspection.title}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.background = 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)';
+                    target.alt = "이미지 없음";
+                  }}
+                />
                 <CardInfo>
                   <CardTitle>{inspection.title}</CardTitle>
                   <CardAddress>{inspection.address}</CardAddress>

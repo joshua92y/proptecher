@@ -69,57 +69,61 @@ export default function AdminInspectionsPage() {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       
-      // TODO: 실제 인증 토큰 사용
-      const response = await fetch(`${apiUrl}/api/admin/inspections/requests`, {
-        headers: {
-          // 'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: InspectionListResponse = await response.json();
+      // 개발 중: Mock 데이터 사용 (인증 구현 후 API 연동)
+      console.log("📋 임장 요청 목록 로딩 (Mock 데이터)");
       
-      // 주소를 좌표로 변환 (Kakao Geocoder 사용)
-      const requestsWithCoords = await Promise.all(
-        data.requests.map(async (req) => {
-          const coords = await geocodeAddress(req.address);
-          return {
-            ...req,
-            lat: coords?.lat,
-            lng: coords?.lng,
-          };
-        })
-      );
-
-      setRequests(requestsWithCoords);
-    } catch (error) {
-      console.error("임장 요청 목록 로딩 실패:", error);
       // Mock 데이터 사용
+      await new Promise(resolve => setTimeout(resolve, 500)); // 로딩 시뮬레이션
+      
       setRequests([
         {
           id: "1",
           title: "서울 강남구 아파트",
           address: "서울특별시 강남구 테헤란로 123",
           priceText: "매매 10억원",
-          img: null,
+          img: "/images/apartment-1.jpg",
           lat: 37.5012,
           lng: 127.0396,
+          preferredDate: "2025-11-15",
+          contactPhone: "010-1234-5678",
         },
         {
           id: "2",
           title: "서울 송파구 오피스텔",
           address: "서울특별시 송파구 올림픽로 345",
           priceText: "전세 5억원",
-          img: null,
+          img: "/images/officetel-1.jpg",
           lat: 37.5145,
           lng: 127.1059,
+          preferredDate: "2025-11-20",
+          contactPhone: "010-2345-6789",
+        },
+        {
+          id: "3",
+          title: "서울 서초구 빌라",
+          address: "서울특별시 서초구 서초대로 456",
+          priceText: "월세 500/50만원",
+          img: "/images/villa-1.jpg",
+          lat: 37.4834,
+          lng: 127.0323,
+          preferredDate: "2025-11-18",
+          contactPhone: "010-3456-7890",
         },
       ]);
+      
+      // TODO: 실제 API 연동 (인증 구현 후)
+      // const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      // const response = await fetch(`${apiUrl}/api/admin/inspections/requests`, {
+      //   headers: {
+      //     'Authorization': `Bearer ${token}`,
+      //   },
+      // });
+      // const data = await response.json();
+      // setRequests(data.requests);
+      
+    } catch (error) {
+      console.error("임장 요청 목록 로딩 실패:", error);
     } finally {
       setLoading(false);
     }
@@ -334,7 +338,16 @@ export default function AdminInspectionsPage() {
             ) : (
               visibleList.map((req) => (
                 <RequestCard key={req.id} onClick={() => goDetail(req.id)}>
-                  <Thumb src={req.img || "/images/placeholder.jpg"} alt={req.title} />
+                  <Thumb 
+                    src={req.img || "/images/apartment-1.jpg"} 
+                    alt={req.title}
+                    onError={(e) => {
+                      // 이미지 로드 실패 시 기본 이미지로 대체
+                      const target = e.target as HTMLImageElement;
+                      target.style.background = 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)';
+                      target.alt = "이미지 없음";
+                    }}
+                  />
                   <Info>
                     <h3>{req.title}</h3>
                     <p>{req.address}</p>
