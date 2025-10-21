@@ -5,8 +5,11 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 
 url = [
     path("admin/", admin.site.urls),
-    path("api/locations/", include("locations.urls")),
-    path("api/topojson/", include("locations.urls")),  # TopoJSON API
+    # path("api/locations/", include("locations.urls")),  # 임시 비활성화
+    # path("api/topojson/", include("locations.urls")),  # TopoJSON API (임시 비활성화)
+    path("api/", include("listings.urls")),  # Listings API
+    path("api/", include("inspections.urls")),  # Inspections API
+    path("api/", include("notices.urls")),  # Notices API
 ]
 
 swagger_ui = [

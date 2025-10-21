@@ -2,13 +2,15 @@
 # Core Django
 Django==5.2.6
 djangorestframework==3.16.1
+djangorestframework-simplejwt==5.5.1
+django-cors-headers==4.6.0
 
 # GeoDjango (PostGIS)
 psycopg2-binary==2.9.10
 
 # Celery
 celery==5.4.0
-django-celery-beat==2.7.0
+django-celery-beat==2.8.0
 django-celery-results==2.5.1
 
 # Dragonfly/Redis
@@ -28,7 +30,7 @@ django-filter==24.3
 drf-spectacular==0.28.0
 
 # WebSocket (선택사항)
-channels==4.2.0
+channels==4.2.2
 channels-redis==4.3.0
 
 # 태그 기능 (선택사항)
