@@ -68,7 +68,7 @@ const Container = styled.nav`
   align-items: center;
   justify-content: space-around;
   padding: 0 8px;
-  z-index: 100;
+  z-index: 1000;
   box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05);
 `;
 

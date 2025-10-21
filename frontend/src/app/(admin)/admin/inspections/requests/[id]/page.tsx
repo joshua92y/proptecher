@@ -287,7 +287,7 @@ const Container = styled.div`
   min-height: 100vh;
   background: #f8f9fa;
   animation: ${fadeIn} 0.3s ease;
-  padding-bottom: 120px; /* 하단 네비게이션 바와 충분한 여백 확보 */
+  padding-bottom: 140px; /* ButtonGroup(64px + 패딩) + BottomNav(64px) 고려 */
 `;
 
 const HeroImage = styled.img`
@@ -391,14 +391,14 @@ const Tag = styled.span`
 
 const ButtonGroup = styled.div`
   position: fixed;
-  bottom: 0;
+  bottom: 64px; /* BottomNav 높이만큼 위로 이동 */
   left: 0;
   right: 0;
   display: flex;
   padding: 16px;
   background: white;
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.1);
-  z-index: 1000; /* BottomNav(100)보다 높은 값으로 설정 */
+  z-index: 999; /* BottomNav(1000)보다 낮게 설정 */
 `;
 
 const AcceptButton = styled.button`
