@@ -398,7 +398,7 @@ const ButtonGroup = styled.div`
   padding: 16px;
   background: white;
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.1);
-  z-index: 200; /* BottomNav(1000)보다 높은 값으로 설정 */
+  z-index: 1000; /* BottomNav(100)보다 높은 값으로 설정 */
 `;
 
 const AcceptButton = styled.button`
