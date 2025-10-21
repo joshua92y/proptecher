@@ -94,7 +94,7 @@ export default function ActiveInspectionsPage() {
   };
 
   return (
-    <MobileLayout>
+    <MobileLayout showBottomNav={false}>
       <Container>
         <Header>
           <Title>🔄 진행중인 임장</Title>

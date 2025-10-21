@@ -156,7 +156,7 @@ export default function RequestDetailPage() {
   const requestDate = new Date(request.requested_at);
 
   return (
-    <MobileLayout>
+    <MobileLayout showBottomNav={false}>
       <Container>
         <HeroImage 
           src={request.img || "/images/apartment-1.jpg"} 

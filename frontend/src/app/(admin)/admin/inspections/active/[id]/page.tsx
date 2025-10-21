@@ -67,7 +67,7 @@ export default function InspectionProgressPage() {
   const progressSteps = [0, 25, 50, 75, 100];
 
   return (
-    <MobileLayout>
+    <MobileLayout showBottomNav={false}>
       <Container>
         <Header>
           <BackButton onClick={() => router.back()}>←</BackButton>

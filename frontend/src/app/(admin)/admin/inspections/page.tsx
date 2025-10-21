@@ -415,6 +415,7 @@ const Wrap = styled.div`
   height: 100vh;
   overflow: hidden;
   background: #f5f5f5;
+  padding-bottom: 64px; /* 하단 네비게이션 바 높이만큼 패딩 추가 */
 `;
 
 const MapWrap = styled.div`
