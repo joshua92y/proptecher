@@ -37,18 +37,12 @@ export default function RequestDetailPage() {
     const fetchDetail = async () => {
       try {
         setLoading(true);
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         
-        const response = await fetch(`${apiUrl}/api/admin/inspections/requests/${requestId}`);
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        setRequest(data);
-      } catch (error) {
-        console.error("임장 요청 상세 로딩 실패:", error);
+        // 개발 중: Mock 데이터 사용 (인증 구현 후 API 연동)
+        console.log("📋 임장 요청 상세 로딩 (Mock 데이터)");
+        
+        await new Promise(resolve => setTimeout(resolve, 300)); // 로딩 시뮬레이션
+        
         // Mock 데이터
         setRequest({
           id: requestId,
@@ -60,12 +54,25 @@ export default function RequestDetailPage() {
           preferred_date: "2025-11-15",
           contact_phone: "010-1234-5678",
           request_note: "주말 오후 방문 희망합니다. 주차 가능 여부도 확인 부탁드립니다.",
-          description: "최근 리모델링한 깔끔한 아파트입니다.",
-          highlights: ["남향", "고층", "역세권"],
+          description: "최근 리모델링한 깔끔한 아파트입니다. 남향이며 고층입니다.",
+          highlights: ["남향", "고층", "역세권", "주차 2대"],
           photos: null,
           requested_at: Date.now(),
-          img: null,
+          img: "/images/apartment-1.jpg",
         });
+        
+        // TODO: 실제 API 연동 (인증 구현 후)
+        // const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        // const response = await fetch(`${apiUrl}/api/admin/inspections/requests/${requestId}`, {
+        //   headers: {
+        //     'Authorization': `Bearer ${token}`,
+        //   },
+        // });
+        // const data = await response.json();
+        // setRequest(data);
+        
+      } catch (error) {
+        console.error("임장 요청 상세 로딩 실패:", error);
       } finally {
         setLoading(false);
       }
@@ -151,7 +158,15 @@ export default function RequestDetailPage() {
   return (
     <MobileLayout>
       <Container>
-        <HeroImage src={request.img || "/images/placeholder.jpg"} alt={request.title} />
+        <HeroImage 
+          src={request.img || "/images/apartment-1.jpg"} 
+          alt={request.title}
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            target.alt = "이미지 없음";
+          }}
+        />
 
         <ContentWrap>
           <Section>

@@ -71,6 +71,8 @@ celerybeat.pid
 # dotenv
 .env
 .ENV
+.env.local
+**/.env.local
 
 # virtualenv
 .venv
