@@ -71,7 +71,7 @@ export default function RequestDetailPage() {
           highlights: ["남향", "고층", "역세권", "주차 2대"],
           photos: null,
           requested_at: Date.now(),
-          img: "/images/apartment-1.jpg",
+          img: "/images/apt1.jpg",
           lat: 37.5012,  // 강남역 근처 좌표
           lng: 127.0396,
         });
@@ -102,18 +102,25 @@ export default function RequestDetailPage() {
 
     try {
       setProcessing(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       
-      const response = await fetch(`${apiUrl}/api/admin/inspections/${requestId}/accept`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error("수락 실패");
-      }
+      // 개발 중: Mock 처리 (인증 구현 후 API 연동)
+      console.log("✅ 임장 요청 수락 처리 (Mock):", requestId);
+      await new Promise(resolve => setTimeout(resolve, 500)); // 처리 시뮬레이션
+      
+      // TODO: 실제 API 연동 (인증 구현 후)
+      // const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      // const response = await fetch(`${apiUrl}/api/admin/inspections/${requestId}/accept`, {
+      //   method: "POST",
+      //   headers: {
+      //     'Authorization': `Bearer ${token}`,
+      //   },
+      // });
+      // if (!response.ok) {
+      //   throw new Error("수락 실패");
+      // }
 
       alert("✅ 임장 요청을 수락했습니다!");
-      router.push("/admin/inspections/active");
+      router.push("/admin/inspections");
     } catch (error) {
       console.error("수락 처리 실패:", error);
       alert("❌ 수락 처리에 실패했습니다.");

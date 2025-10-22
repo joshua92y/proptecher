@@ -40,7 +40,7 @@ export default function ActiveInspectionsPage() {
             address: "서울특별시 강남구 테헤란로 123",
             priceText: "매매 10억원",
             progress: 50,
-            img: "/images/apartment-1.jpg",
+            img: "/images/apt1.jpg",
           },
           {
             id: "2",
@@ -49,7 +49,7 @@ export default function ActiveInspectionsPage() {
             address: "서울특별시 송파구 올림픽로 345",
             priceText: "전세 5억원",
             progress: 25,
-            img: "/images/officetel-1.jpg",
+            img: "/images/room1.jpg",
           },
           {
             id: "3",
@@ -58,7 +58,7 @@ export default function ActiveInspectionsPage() {
             address: "서울특별시 서초구 서초대로 456",
             priceText: "월세 500/50만원",
             progress: 75,
-            img: "/images/villa-1.jpg",
+            img: "/images/house1.jpg",
           },
         ]);
         
@@ -83,7 +83,7 @@ export default function ActiveInspectionsPage() {
   }, []);
 
   const goDetail = (id: string) => {
-    router.push(`/admin/inspections/active/${id}`);
+    router.push(`/admin/inspections/progress/${id}`);
   };
 
   const getProgressColor = (progress: number) => {
@@ -114,7 +114,7 @@ export default function ActiveInspectionsPage() {
             inspections.map((inspection) => (
               <Card key={inspection.id} onClick={() => goDetail(inspection.id)}>
                 <Thumb 
-                  src={inspection.img || "/images/apartment-1.jpg"} 
+                  src={inspection.img || "/images/apt1.jpg"} 
                   alt={inspection.title}
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;

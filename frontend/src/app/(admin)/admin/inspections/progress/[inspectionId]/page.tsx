@@ -6,6 +6,8 @@
 import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import MobileLayout from "@/components/MobileLayout";
 import { repo } from "@/lib/repos/inspections";
 import type { ActiveInspection } from "@/lib/repos/inspections";
 
@@ -41,66 +43,92 @@ const defaultDoc = (): ProgressDoc => ({
   ],
 });
 
-/* 로컬 load/save */
+/* DB load/save */
 function mergeItems(base: ChecklistItem[], saved?: ChecklistItem[]): ChecklistItem[] {
   if (!saved) return base;
   const map = new Map(saved.map(s => [s.id, s]));
   return base.map(b => ({ ...b, ...(map.get(b.id) ?? {}) }));
 }
-function loadDoc(inspectionId: string): ProgressDoc {
+
+async function loadDoc(inspectionId: string): Promise<ProgressDoc> {
   try {
-    const raw = localStorage.getItem(PROG_PREFIX + inspectionId);
-    if (!raw) return defaultDoc();
-    const parsed = JSON.parse(raw) as ProgressDoc;
-    const base = defaultDoc();
-    return {
-      ...base,
-      ...parsed,
-      external: mergeItems(base.external, parsed.external),
-      internal: mergeItems(base.internal, parsed.internal),
-    };
-  } catch {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const response = await fetch(`${apiUrl}/api/admin/inspections/${inspectionId}/progress`);
+    
+    if (response.ok) {
+      const data = await response.json();
+      const base = defaultDoc();
+      
+      if (data.checklistData) {
+        return {
+          ...base,
+          floorplan: data.checklistData.floorplan || null,
+          external: mergeItems(base.external, data.checklistData.external),
+          internal: mergeItems(base.internal, data.checklistData.internal),
+        };
+      }
+    }
+    
+    return defaultDoc();
+  } catch (error) {
+    console.error("진행 상황 불러오기 실패:", error);
     return defaultDoc();
   }
 }
-function saveDoc(inspectionId: string, doc: ProgressDoc) {
-  localStorage.setItem(PROG_PREFIX + inspectionId, JSON.stringify(doc));
+
+async function saveDoc(inspectionId: string, doc: ProgressDoc) {
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    await fetch(`${apiUrl}/api/admin/inspections/${inspectionId}/save-progress`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        checklistData: {
+          floorplan: doc.floorplan,
+          external: doc.external,
+          internal: doc.internal,
+        },
+      }),
+    });
+  } catch (error) {
+    console.error("진행 상황 저장 실패:", error);
+  }
 }
 
-/* 진행률 계산 + everywhere 반영 */
+/* 진행률 계산 + DB 반영 */
 async function updateProgressEverywhere(inspectionId: string, doc: ProgressDoc) {
   const all = [...doc.external, ...doc.internal];
   const total = 1 + all.length; // 1 = 평면도
   const done = (doc.floorplan ? 1 : 0) + all.filter(i => i.checked).length;
   const pct = Math.round((done / total) * 100);
 
-  // 1) 레포에 지원되면 호출
+  // DB에 진행률 저장
   try {
-    // @ts-ignore (옵셔널 메소드)
-    if (repo.updateInspectionProgress) await repo.updateInspectionProgress(inspectionId, pct);
-  } catch { /* no-op */ }
-
-  // 2) 로컬 active 반영
-  try {
-    const ACT_KEY = "inspections:active";
-    const raw = localStorage.getItem(ACT_KEY);
-    if (raw) {
-      const arr: ActiveInspection[] = JSON.parse(raw);
-      const idx = arr.findIndex(x => x.id === inspectionId);
-      if (idx !== -1) {
-        arr[idx] = { ...arr[idx], progress: pct };
-        localStorage.setItem(ACT_KEY, JSON.stringify(arr));
-        window.dispatchEvent(new Event("inspections-updated"));
-      }
-    }
-  } catch { /* no-op */ }
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    await fetch(`${apiUrl}/api/admin/inspections/${inspectionId}/save-progress`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        progress: pct,
+      }),
+    });
+  } catch (error) {
+    console.error("진행률 저장 실패:", error);
+  }
 }
 
 /* ───────────── 페이지 ───────────── */
-type Props = { params: { inspectionId: string } };
+import React from "react";
+
+type Props = { params: Promise<{ inspectionId: string }> };
 
 export default function ProgressPage({ params }: Props) {
-  const { inspectionId } = params;
+  const { inspectionId } = React.use(params);
+  const router = useRouter();
 
   const [header, setHeader] = useState<{ title: string; address: string } | null>(null);
   const [doc, setDoc] = useState<ProgressDoc | null>(null);
@@ -123,7 +151,11 @@ export default function ProgressPage({ params }: Props) {
 
   // 문서 로드
   useEffect(() => {
-    setDoc(loadDoc(inspectionId));
+    const load = async () => {
+      const loaded = await loadDoc(inspectionId);
+      setDoc(loaded);
+    };
+    load();
   }, [inspectionId]);
 
   // 진행률 반영
@@ -192,18 +224,21 @@ export default function ProgressPage({ params }: Props) {
 
   const submitReport = async () => {
     if (!doc) return;
+    // 현재 진행 상황 저장
     saveDoc(inspectionId, doc);
     await updateProgressEverywhere(inspectionId, doc);
-    alert("보고서가 확정되었습니다.");
+    // 보고서 작성 페이지로 이동
+    router.push(`/admin/inspections/report/${inspectionId}`);
   };
 
   return (
-    <Wrap>
-      <Header>
-        <Back href="/admin/inspections/active">‹</Back>
-        <H1>{header?.address || header?.title || "진행중 임장"}</H1>
-        <Spacer />
-      </Header>
+    <MobileLayout showBottomNav={false}>
+      <Wrap>
+        <Header>
+          <BackButton onClick={() => router.back()}>‹</BackButton>
+          <H1>{header?.address || header?.title || "진행중 임장"}</H1>
+          <Spacer />
+        </Header>
 
       {isLoading ? (
         <Empty>불러오는 중…</Empty>
@@ -348,7 +383,8 @@ export default function ProgressPage({ params }: Props) {
           <BtnPrimary onClick={submitReport}>보고서 확정</BtnPrimary>
         </BottomBar>
       )}
-    </Wrap>
+      </Wrap>
+    </MobileLayout>
   );
 }
 
@@ -363,12 +399,25 @@ function fileToDataURL(file: File): Promise<string> {
 }
 
 /* ───────────── styled ───────────── */
-const Wrap = styled.div``;
+const Wrap = styled.div`
+  min-height: 100vh;
+  background: #f8f9fa;
+  padding-bottom: 80px;
+`;
 
 const Header = styled.div`
   display:flex; align-items:center; gap:8px; padding:12px;
+  background: white;
+  border-bottom: 1px solid #eee;
 `;
-const Back = styled(Link)`font-size:20px;`;
+const BackButton = styled.button`
+  font-size:20px;
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: #333;
+`;
 const H1 = styled.h1`flex:1; text-align:center; font-size:16px; margin:0;`;
 const Spacer = styled.div`width:20px;`;
 

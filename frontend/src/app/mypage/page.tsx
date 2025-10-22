@@ -1,15 +1,19 @@
 "use client";
 
 import styled from "styled-components";
+import { useRouter } from "next/navigation";
 import MobileLayout from "@/components/MobileLayout";
 
 export default function MyPage() {
+  const router = useRouter();
+
   const menuItems = [
-    { id: "profile", label: "프로필 수정", icon: "✏️" },
-    { id: "favorites", label: "관심 매물", icon: "❤️" },
-    { id: "history", label: "최근 본 매물", icon: "👁️" },
-    { id: "inquiries", label: "문의 내역", icon: "💬" },
-    { id: "settings", label: "설정", icon: "⚙️" },
+    { id: "inspections", label: "내 임장보고서", icon: "📋", path: "/mypage/inspections" },
+    { id: "profile", label: "프로필 수정", icon: "✏️", path: "" },
+    { id: "favorites", label: "관심 매물", icon: "❤️", path: "" },
+    { id: "history", label: "최근 본 매물", icon: "👁️", path: "" },
+    { id: "inquiries", label: "문의 내역", icon: "💬", path: "" },
+    { id: "settings", label: "설정", icon: "⚙️", path: "" },
   ];
 
   return (
@@ -24,7 +28,14 @@ export default function MyPage() {
 
         <MenuSection>
           {menuItems.map((item) => (
-            <MenuItem key={item.id}>
+            <MenuItem
+              key={item.id}
+              onClick={() => {
+                if (item.path) {
+                  router.push(item.path);
+                }
+              }}
+            >
               <MenuIcon>{item.icon}</MenuIcon>
               <MenuLabel>{item.label}</MenuLabel>
               <MenuArrow>›</MenuArrow>

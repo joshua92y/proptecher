@@ -153,6 +153,12 @@ class ActiveInspection(models.Model):
         blank=True,
         verbose_name='평면도 이미지 URL'
     )
+    평면도데이터 = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='평면도 편집 데이터',
+        help_text='벽, 방, 오브젝트 등 편집 가능한 평면도 데이터'
+    )
     리포트URL = models.TextField(
         null=True,
         blank=True,
@@ -166,6 +172,36 @@ class ActiveInspection(models.Model):
         verbose_name='평가사 메모'
     )
 
+    # 보고서 (확정 후 작성)
+    보고서확정여부 = models.BooleanField(
+        default=False,
+        verbose_name='보고서 확정 여부'
+    )
+    종합의견 = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name='종합 의견',
+        help_text='평가사의 최종 종합 의견'
+    )
+    추천여부 = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        choices=[
+            ('적극추천', '적극 추천'),
+            ('추천', '추천'),
+            ('보류', '보류'),
+            ('비추천', '비추천'),
+        ],
+        verbose_name='추천 여부'
+    )
+    체크리스트데이터 = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='체크리스트 데이터',
+        help_text='외부/내부 체크리스트 및 사진 데이터'
+    )
+
     # 타임스탬프
     시작일시 = models.DateTimeField(
         auto_now_add=True,
@@ -174,6 +210,11 @@ class ActiveInspection(models.Model):
     수정일시 = models.DateTimeField(
         auto_now=True,
         verbose_name='수정 일시'
+    )
+    확정일시 = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='보고서 확정 일시'
     )
 
     class Meta:
