@@ -73,26 +73,26 @@ export default function PolicyPage() {
   return (
     <MobileLayout title="정책 정보">
       <Container>
-        <Header>
-          <Title>부동산 정책 정보</Title>
-          <Subtitle>최신 부동산 관련 정책을 확인하세요</Subtitle>
+        <Header suppressHydrationWarning={true}>
+          <Title suppressHydrationWarning={true}>부동산 정책 정보</Title>
+          <Subtitle suppressHydrationWarning={true}>최신 부동산 관련 정책을 확인하세요</Subtitle>
         </Header>
 
-        <CategoryFilter>
+        <CategoryFilter suppressHydrationWarning={true}>
           {categories.map((cat) => (
-            <CategoryButton key={cat.id} $active={cat.active}>
+            <CategoryButton key={cat.id} $active={cat.active} suppressHydrationWarning={true}>
               {cat.label}
             </CategoryButton>
           ))}
         </CategoryFilter>
 
-        <PolicyList>
+        <PolicyList suppressHydrationWarning={true}>
           {policies.map((policy) => {
             const colors = getCategoryColor(policy.category);
             return (
-              <PolicyItem key={policy.id}>
-                <PolicyHeader>
-                  <CategoryTag $bg={colors.bg} $color={colors.color}>
+              <PolicyItem key={policy.id} suppressHydrationWarning={true}>
+                <PolicyHeader suppressHydrationWarning={true}>
+                  <CategoryTag $bg={colors.bg} $color={colors.color} suppressHydrationWarning={true}>
                     {policy.category}
                   </CategoryTag>
                   <PolicyMeta>

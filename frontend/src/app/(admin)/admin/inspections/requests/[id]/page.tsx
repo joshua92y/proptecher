@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import styled, { keyframes } from "styled-components";
 import MobileLayout from "@/components/MobileLayout";
+import KakaoMap, { MapMarker } from "@/components/KakaoMap";
 
 // 임장 요청 상세 타입
 interface InspectionRequestDetail {
@@ -21,6 +22,8 @@ interface InspectionRequestDetail {
   photos: string[] | null;
   requested_at: number;
   img: string | null;
+  lat?: number;
+  lng?: number;
 }
 
 export default function RequestDetailPage() {
@@ -31,6 +34,16 @@ export default function RequestDetailPage() {
   const [request, setRequest] = useState<InspectionRequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+
+  // 지도 마커 데이터
+  const mapMarkers: MapMarker[] = request && request.lat && request.lng ? [
+    {
+      id: request.id,
+      position: { lat: request.lat, lng: request.lng },
+      title: request.title,
+      price: request.priceText,
+    }
+  ] : [];
 
   // 요청 상세 가져오기
   useEffect(() => {
@@ -58,7 +71,9 @@ export default function RequestDetailPage() {
           highlights: ["남향", "고층", "역세권", "주차 2대"],
           photos: null,
           requested_at: Date.now(),
-          img: "/images/apartment-1.jpg",
+          img: "/images/apt1.jpg",
+          lat: 37.5012,  // 강남역 근처 좌표
+          lng: 127.0396,
         });
         
         // TODO: 실제 API 연동 (인증 구현 후)
@@ -87,18 +102,25 @@ export default function RequestDetailPage() {
 
     try {
       setProcessing(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       
-      const response = await fetch(`${apiUrl}/api/admin/inspections/${requestId}/accept`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error("수락 실패");
-      }
+      // 개발 중: Mock 처리 (인증 구현 후 API 연동)
+      console.log("✅ 임장 요청 수락 처리 (Mock):", requestId);
+      await new Promise(resolve => setTimeout(resolve, 500)); // 처리 시뮬레이션
+      
+      // TODO: 실제 API 연동 (인증 구현 후)
+      // const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      // const response = await fetch(`${apiUrl}/api/admin/inspections/${requestId}/accept`, {
+      //   method: "POST",
+      //   headers: {
+      //     'Authorization': `Bearer ${token}`,
+      //   },
+      // });
+      // if (!response.ok) {
+      //   throw new Error("수락 실패");
+      // }
 
       alert("✅ 임장 요청을 수락했습니다!");
-      router.push("/admin/inspections/active");
+      router.push("/admin/inspections");
     } catch (error) {
       console.error("수락 처리 실패:", error);
       alert("❌ 수락 처리에 실패했습니다.");
@@ -107,31 +129,6 @@ export default function RequestDetailPage() {
     }
   };
 
-  // 거절 처리
-  const handleReject = async () => {
-    if (!confirm("이 임장 요청을 거절하시겠습니까?")) return;
-
-    try {
-      setProcessing(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      
-      const response = await fetch(`${apiUrl}/api/admin/inspections/${requestId}/reject`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error("거절 실패");
-      }
-
-      alert("거절 처리되었습니다.");
-      router.push("/admin/inspections");
-    } catch (error) {
-      console.error("거절 처리 실패:", error);
-      alert("❌ 거절 처리에 실패했습니다.");
-    } finally {
-      setProcessing(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -158,8 +155,8 @@ export default function RequestDetailPage() {
   return (
     <MobileLayout>
       <Container>
-        <HeroImage 
-          src={request.img || "/images/apartment-1.jpg"} 
+        <HeroImage
+          src={request.img || "/images/apartment-1.jpg"}
           alt={request.title}
           onError={(e) => {
             const target = e.target as HTMLImageElement;
@@ -167,6 +164,20 @@ export default function RequestDetailPage() {
             target.alt = "이미지 없음";
           }}
         />
+
+        {request.lat && request.lng && (
+          <PropertyMapWrap>
+            <MapTitle>🏠 매물 위치</MapTitle>
+            <KakaoMap
+              center={{ lat: request.lat, lng: request.lng }}
+              level={3} // 확대된 상태로 표시
+              markers={mapMarkers}
+              width="100%"
+              height="300px"
+              useClusterer={false}
+            />
+          </PropertyMapWrap>
+        )}
 
         <ContentWrap>
           <Section>
@@ -259,9 +270,6 @@ export default function RequestDetailPage() {
         </ContentWrap>
 
         <ButtonGroup>
-          <RejectButton onClick={handleReject} disabled={processing}>
-            {processing ? "처리 중..." : "거절하기"}
-          </RejectButton>
           <AcceptButton onClick={handleAccept} disabled={processing}>
             {processing ? "처리 중..." : "수락하기"}
           </AcceptButton>
@@ -286,7 +294,7 @@ const Container = styled.div`
   min-height: 100vh;
   background: #f8f9fa;
   animation: ${fadeIn} 0.3s ease;
-  padding-bottom: 100px;
+  padding-bottom: 140px; /* ButtonGroup(64px + 패딩) + BottomNav(64px) 고려 */
 `;
 
 const HeroImage = styled.img`
@@ -294,6 +302,19 @@ const HeroImage = styled.img`
   height: 280px;
   object-fit: cover;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+`;
+
+const PropertyMapWrap = styled.div`
+  padding: 16px 20px;
+  background: white;
+  border-bottom: 1px solid #eee;
+`;
+
+const MapTitle = styled.h2`
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
 `;
 
 const ContentWrap = styled.div`
@@ -377,19 +398,18 @@ const Tag = styled.span`
 
 const ButtonGroup = styled.div`
   position: fixed;
-  bottom: 0;
+  bottom: 64px; /* BottomNav 높이만큼 위로 이동 */
   left: 0;
   right: 0;
   display: flex;
-  gap: 12px;
   padding: 16px;
   background: white;
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.1);
-  z-index: 100;
+  z-index: 999; /* BottomNav(1000)보다 낮게 설정 */
 `;
 
-const BaseButton = styled.button`
-  flex: 1;
+const AcceptButton = styled.button`
+  width: 100%;
   height: 52px;
   border: none;
   border-radius: 12px;
@@ -397,34 +417,21 @@ const BaseButton = styled.button`
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
 
-  &:active:not(:disabled) {
-    transform: scale(0.98);
-  }
-`;
-
-const RejectButton = styled(BaseButton)`
-  background: white;
-  color: #EF4444;
-  border: 2px solid #EF4444;
-
-  &:hover:not(:disabled) {
-    background: #FEF2F2;
-  }
-`;
-
-const AcceptButton = styled(BaseButton)`
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-
   &:hover:not(:disabled) {
     box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.98);
   }
 `;
 

@@ -51,7 +51,7 @@ class ActiveInspectionAdmin(admin.ModelAdmin):
     """
     list_display = [
         'id', 'get_매물제목', '평가사ID', '진행률',
-        '시작일시', '수정일시'
+        'get_평면도상태', '시작일시', '수정일시'
     ]
     list_filter = ['진행률', '시작일시']
     search_fields = ['요청ID__매물제목', '평가사ID__이름']
@@ -64,7 +64,7 @@ class ActiveInspectionAdmin(admin.ModelAdmin):
             'fields': ('요청ID', '평가사ID', '진행률')
         }),
         ('파일 및 메모', {
-            'fields': ('평면도URL', '리포트URL', '평가사메모')
+            'fields': ('평면도URL', '평면도데이터', '리포트URL', '평가사메모')
         }),
         ('타임스탬프', {
             'fields': ('시작일시', '수정일시'),
@@ -76,6 +76,16 @@ class ActiveInspectionAdmin(admin.ModelAdmin):
         return obj.요청ID.매물제목
     get_매물제목.short_description = '매물 제목'
     get_매물제목.admin_order_field = '요청ID__매물제목'
+    
+    def get_평면도상태(self, obj):
+        if obj.평면도데이터:
+            data = obj.평면도데이터
+            walls = len(data.get('walls', [])) if isinstance(data, dict) else 0
+            rooms = len(data.get('rooms', [])) if isinstance(data, dict) else 0
+            objects = len(data.get('objects', [])) if isinstance(data, dict) else 0
+            return f'✅ 벽{walls} 방{rooms} 가구{objects}'
+        return '❌ 미작성'
+    get_평면도상태.short_description = '평면도'
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
