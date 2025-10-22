@@ -1,0 +1,27 @@
+import type {
+  InspectionsRepo,
+  RequestCard,
+  ActiveInspection,
+  RequestDetail,
+  CreateRequestDTO,
+  InspectionStatus,
+} from "./types";
+
+/** 아직 서버 미연결 — 스텁 */
+export const apiRepo: InspectionsRepo = {
+  subscribe() { return () => {}; },
+
+  async getRequests(): Promise<RequestCard[]> { throw new Error("API repo not implemented"); },
+  async getActive(): Promise<ActiveInspection[]> { throw new Error("API repo not implemented"); },
+  async getRequestDetail(_id: string): Promise<RequestDetail | null> { throw new Error("API repo not implemented"); },
+
+  async getByListing(_listingId: string): Promise<{ status: InspectionStatus } | null> {
+    throw new Error("API repo not implemented");
+  },
+
+  async createRequestFromListing(_listingId: string, _dto: CreateRequestDTO) {
+    throw new Error("API repo not implemented");
+  },
+  async acceptRequest(_requestId: string) { throw new Error("API repo not implemented"); },
+  async rejectRequest(_requestId: string) { throw new Error("API repo not implemented"); },
+};

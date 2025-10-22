@@ -2,22 +2,6 @@
 version: '3.8'
 
 services:
-  # PostgreSQL + PostGIS 데이터베이스
-  postgres:
-    image: postgis/postgis:15-3.3
-    container_name: codelab_postgres
-    environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: yoon1992
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - codelab_network
-
   # Dragonfly 서버 (Redis 호환)
   dragonfly:
     image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
@@ -40,15 +24,14 @@ services:
       - media_files:/app/media
     environment:
       - DEBUG=True
-      - DATABASE_HOST=postgres
+      - DATABASE_HOST=133.186.155.85  # 클라우드 PostgreSQL
       - DATABASE_PORT=5432
-      - DATABASE_NAME=postgres
+      - DATABASE_NAME=propdb
       - DATABASE_USER=postgres
       - DATABASE_PASSWORD=yoon1992
       - REDIS_HOST=dragonfly
       - REDIS_PORT=6379
     depends_on:
-      - postgres
       - dragonfly
     networks:
       - codelab_network
@@ -64,15 +47,14 @@ services:
       - media_files:/app/media
     environment:
       - DEBUG=True
-      - DATABASE_HOST=postgres
+      - DATABASE_HOST=133.186.155.85  # 클라우드 PostgreSQL
       - DATABASE_PORT=5432
-      - DATABASE_NAME=postgres
+      - DATABASE_NAME=propdb
       - DATABASE_USER=postgres
       - DATABASE_PASSWORD=yoon1992
       - REDIS_HOST=dragonfly
       - REDIS_PORT=6379
     depends_on:
-      - postgres
       - dragonfly
     networks:
       - codelab_network
@@ -86,15 +68,14 @@ services:
       - .:/app
     environment:
       - DEBUG=True
-      - DATABASE_HOST=postgres
+      - DATABASE_HOST=133.186.155.85  # 클라우드 PostgreSQL
       - DATABASE_PORT=5432
-      - DATABASE_NAME=postgres
+      - DATABASE_NAME=propdb
       - DATABASE_USER=postgres
       - DATABASE_PASSWORD=yoon1992
       - REDIS_HOST=dragonfly
       - REDIS_PORT=6379
     depends_on:
-      - postgres
       - dragonfly
     networks:
       - codelab_network
@@ -110,21 +91,19 @@ services:
       - .:/app
     environment:
       - DEBUG=True
-      - DATABASE_HOST=postgres
+      - DATABASE_HOST=133.186.155.85  # 클라우드 PostgreSQL
       - DATABASE_PORT=5432
-      - DATABASE_NAME=postgres
+      - DATABASE_NAME=propdb
       - DATABASE_USER=postgres
       - DATABASE_PASSWORD=yoon1992
       - REDIS_HOST=dragonfly
       - REDIS_PORT=6379
     depends_on:
-      - postgres
       - dragonfly
     networks:
       - codelab_network
 
 volumes:
-  postgres_data:
   static_files:
   media_files:
 
