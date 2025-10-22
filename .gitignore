@@ -1,98 +1,31 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
-venv/
-ENV/
-env/
-.env
-
-# Django
-*.log
-local_settings.py
-db.sqlite3
-media/
-staticfiles/
-
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Coverage reports
-.coverage
-*.cover
-.pytest_cache/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# dotenv
+# 환경변수 파일 (민감 정보)
 .env
 .ENV
 .env.local
 **/.env.local
+backend/.env
+frontend/.env.local
 
-# virtualenv
+# Python 캐시
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 가상환경
+venv/
 .venv
-venv.bak/
+ENV/
+env/
 
-# Spyder project settings
-.spyderproject
-.spyproject
+# Node.js
+# 빌드 캐시 (Next.js)
+.next/
+frontend/.next/
 
-# Rope project settings
-.ropeproject
+# OS 파일
+.DS_Store
+Thumbs.db
 
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-
-# Pyre type checker
-.pyre/
-
-# OSGeo4W/GDAL
-# 이미 설치된 GDAL 라이브러리 관련 파일들
+# IDE 설정 (선택적)
+.vscode/
+.idea/
