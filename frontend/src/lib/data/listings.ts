@@ -266,16 +266,17 @@ export async function getListings(bounds?: string): Promise<ListingListItem[]> {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const url = bounds 
-      ? `${apiUrl}/api/listings/?bounds=${bounds}`
-      : `${apiUrl}/api/listings/`;
+      ? `${apiUrl}/api/properties/?bounds=${bounds}`
+      : `${apiUrl}/api/properties/`;
     
     const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`Failed to fetch listings: ${res.status}`);
+    if (!res.ok) throw new Error(`Failed to fetch properties: ${res.status}`);
     
-    const json: ListingsResponse = await res.json();
-    return json.listings;
+    const json: any = await res.json();
+    // API 응답이 {properties: [...]} 형태이므로 변환
+    return json.properties || json.listings || [];
   } catch (error) {
-    console.error('Failed to fetch listings from API:', error);
+    console.error('Failed to fetch properties from API:', error);
     // 폴백: 빈 배열 반환
     return [];
   }
@@ -285,12 +286,12 @@ export async function getListings(bounds?: string): Promise<ListingListItem[]> {
 export async function getListingDetailVM(id: string): Promise<ListingDetailVM | null> {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const res = await fetch(`${apiUrl}/api/listings/${id}/`, { cache: "no-store" });
+    const res = await fetch(`${apiUrl}/api/properties/${id}/`, { cache: "no-store" });
     if (!res.ok) throw new Error("bad status");
     const json: ApiListing = await res.json();
     return toVM(json);
   } catch (error) {
-    console.error('Failed to fetch listing detail from API:', error);
+    console.error('Failed to fetch property detail from API:', error);
     // 폴백(mock) — 개발 편의용
     const mock: ApiListing = {
       listing_type: "전세",

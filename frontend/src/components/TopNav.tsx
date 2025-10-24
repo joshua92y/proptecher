@@ -28,8 +28,8 @@ export default function TopNav({ title, showBack = false, onBack }: TopNavProps)
     
     // 경로에 따른 기본 타이틀
     if (pathname === "/") return "홈";
-    if (pathname?.startsWith("/listings") && pathname !== "/listings") return "매물 상세";
-    if (pathname === "/listings") return "부동산 찾기";
+    if (pathname?.startsWith("/properties") && pathname !== "/properties") return "매물 상세";
+    if (pathname === "/properties") return "부동산 찾기";
     if (pathname === "/experts") return "전문가 매칭";
     if (pathname === "/policy") return "정책 정보";
     if (pathname === "/mypage") return "마이페이지";

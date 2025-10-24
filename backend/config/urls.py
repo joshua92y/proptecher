@@ -7,7 +7,7 @@ url = [
     path("admin/", admin.site.urls),
     # path("api/locations/", include("locations.urls")),  # 임시 비활성화
     # path("api/topojson/", include("locations.urls")),  # TopoJSON API (임시 비활성화)
-    path("api/", include("listings.urls")),  # Listings API
+    path("api/", include("properties.urls")),  # Properties API (매물 관리)
     path("api/", include("inspections.urls")),  # Inspections API
     path("api/", include("notices.urls")),  # Notices API
 ]

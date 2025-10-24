@@ -16,7 +16,7 @@ class InspectionRequest(models.Model):
 
     # 관계
     매물ID = models.ForeignKey(
-        'listings.Listing',
+        'properties.Property',
         on_delete=models.CASCADE,
         related_name='inspection_requests',
         verbose_name='매물'
