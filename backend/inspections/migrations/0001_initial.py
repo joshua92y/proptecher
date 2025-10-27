@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('agents', '0001_initial'),
-        ('listings', '0003_alter_listing_qa정보_alter_listing_버스정류장정보_and_more'),
+        ('properties', '0003_alter_property_qa정보_alter_property_버스정류장정보_and_more'),
         ('users', '0001_initial'),
     ]
 
@@ -71,7 +71,7 @@ class Migration(migrations.Migration):
                 ('수락일시', models.DateTimeField(blank=True, null=True, verbose_name='수락 일시')),
                 ('완료일시', models.DateTimeField(blank=True, null=True, verbose_name='완료 일시')),
                 ('담당평가사ID', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='assigned_inspections', to='agents.agent', verbose_name='담당 평가사')),
-                ('매물ID', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='inspection_requests', to='listings.listing', verbose_name='매물')),
+                ('매물ID', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='inspection_requests', to='properties.property', verbose_name='매물')),
                 ('요청자ID', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='my_inspection_requests', to='users.userprofile', verbose_name='요청자')),
             ],
             options={

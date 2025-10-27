@@ -61,12 +61,11 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     "locations",       # 지도, 폴리곤, 지역 정보 관리 (Region 통합)
     "accounts",        # 계정 관리
-    "properties",      # 부동산 db 관리
-    "users",          # 사용자 관리
-    "agents",         # 중개사 관리
-    "listings",       # 매물 관리
-    "inspections",    # 임장 관리
-    "notices",        # 공지사항 관리
+    "users",           # 사용자 관리
+    "agents",          # 중개사 관리
+    "properties",      # 매물 관리 (기존 listings 통합)
+    "inspections",     # 임장 관리
+    "notices",         # 공지사항 관리
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

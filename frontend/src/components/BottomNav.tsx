@@ -19,8 +19,8 @@ export default function BottomNav() {
       id: "listings",
       label: "부동산",
       icon: "🏘️",
-      path: "/listings",
-      isActive: pathname?.startsWith("/listings"),
+      path: "/properties",
+      isActive: pathname?.startsWith("/properties"),
     },
     {
       id: "experts",
