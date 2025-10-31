@@ -14,7 +14,8 @@ class PropertyListSerializer(serializers.ModelSerializer):
     lng = serializers.DecimalField(source='경도', max_digits=11, decimal_places=8)
     img = serializers.SerializerMethodField()
     type = serializers.CharField(source='주택종류')
-    
+    exclusive_area_pyeong = serializers.DecimalField(source='전용면적_평', max_digits=10, decimal_places=2, allow_null=True)
+
     class Meta:
         model = Property
         fields = [
@@ -26,6 +27,7 @@ class PropertyListSerializer(serializers.ModelSerializer):
             'lng',
             'img',
             'type',
+            'exclusive_area_pyeong',
         ]
     
     def get_title(self, obj):

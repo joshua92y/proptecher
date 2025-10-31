@@ -39,7 +39,7 @@ urlpatterns = [
          AdminInspectionViewSet.as_view({'post': 'cancel_active'}),
          name='admin-inspection-cancel'),
     path('admin/inspections/<str:inspection_id>/floorplan',
-         AdminInspectionViewSet.as_view({'get': 'get_floorplan', 'post': 'save_floorplan'}),
+         AdminInspectionViewSet.as_view({'get': 'get_floorplan', 'post': 'save_floorplan', 'delete': 'delete_floorplan'}),
          name='admin-inspection-floorplan'),
     path('admin/inspections/<str:inspection_id>/submit-report',
          AdminInspectionViewSet.as_view({'post': 'submit_report'}),
@@ -53,5 +53,18 @@ urlpatterns = [
     path('admin/inspections/<str:inspection_id>/progress',
          AdminInspectionViewSet.as_view({'get': 'get_progress'}),
          name='admin-inspection-get-progress'),
+    # 추가 목록/수정
+    path('admin/inspections/list-by-buffer',
+         AdminInspectionViewSet.as_view({'get': 'list_by_buffer'}),
+         name='admin-inspection-list-by-buffer'),
+    path('admin/inspections/list-by-requester',
+         AdminInspectionViewSet.as_view({'get': 'list_by_requester'}),
+         name='admin-inspection-list-by-requester'),
+    path('admin/inspections/list-by-agent',
+         AdminInspectionViewSet.as_view({'get': 'list_by_agent'}),
+         name='admin-inspection-list-by-agent'),
+    path('admin/inspections/requests/<str:request_id>/update',
+         AdminInspectionViewSet.as_view({'patch': 'update_request'}),
+         name='admin-inspection-update-request'),
 ]
 

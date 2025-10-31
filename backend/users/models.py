@@ -38,6 +38,18 @@ class UserProfile(models.Model):
         default=True,
         verbose_name='활성화 여부'
     )
+    선호지역목록 = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='관심 지역 목록'
+    )
+    귀촌목적 = models.CharField(
+        max_length=10,
+        null=True,
+        blank=True,
+        choices=[('귀어','귀어'),('귀농','귀농'),('취업','취업'),('기타','기타')],
+        verbose_name='귀촌 목적'
+    )
 
     class Meta:
         verbose_name = '사용자 프로필'

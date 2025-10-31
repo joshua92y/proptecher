@@ -123,7 +123,7 @@ class InspectionRequest(models.Model):
         return f"{self.매물제목} - {self.get_상태_display()}"
 
 
-class ActiveInspection(models.Model):
+class InspectionProgress(models.Model):
     """
     진행중인 임장 모델 (평가사가 수락한 임장)
     """
@@ -218,9 +218,9 @@ class ActiveInspection(models.Model):
     )
 
     class Meta:
-        verbose_name = '진행중인 임장'
-        verbose_name_plural = '진행중인 임장'
-        db_table = 'active_inspections'
+        verbose_name = '임장 진행'
+        verbose_name_plural = '임장 진행'
+        db_table = 'active_inspections'  # 기존 테이블 유지
         ordering = ['-시작일시']
 
     def __str__(self):
@@ -233,7 +233,7 @@ class InspectionCancellation(models.Model):
     """
     # 관계
     임장ID = models.ForeignKey(
-        ActiveInspection,
+        InspectionProgress,
         on_delete=models.CASCADE,
         related_name='cancellations',
         verbose_name='취소된 임장'
@@ -264,4 +264,23 @@ class InspectionCancellation(models.Model):
         verbose_name_plural = '임장 취소'
         db_table = 'inspection_cancellations'
         ordering = ['-취소일시']
+
+
+class Floorplan(models.Model):
+    """평면도 전용 모델"""
+    임장ID = models.OneToOneField(
+        InspectionProgress,
+        on_delete=models.CASCADE,
+        related_name='floorplan',
+        verbose_name='연결된 임장 진행'
+    )
+    데이터 = models.JSONField(null=True, blank=True, verbose_name='평면도 데이터')
+    이미지URL = models.TextField(null=True, blank=True, verbose_name='평면도 이미지 URL')
+    생성일시 = models.DateTimeField(auto_now_add=True)
+    수정일시 = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = '평면도'
+        verbose_name_plural = '평면도'
+        db_table = 'inspection_floorplans'
 

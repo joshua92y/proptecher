@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.core.files.base import ContentFile
 import base64
 import uuid
-from .models import InspectionRequest, ActiveInspection, InspectionCancellation
+from .models import InspectionRequest, InspectionProgress, InspectionCancellation, Floorplan
 from .serializers import (
     InspectionRequestCreateSerializer,
     RequestCardSerializer,
@@ -89,7 +89,7 @@ class InspectionViewSet(viewsets.ViewSet):
         data = []
         for req in completed_requests:
             try:
-                active = ActiveInspection.objects.get(요청ID=req, 보고서확정여부=True)
+                active = InspectionProgress.objects.get(요청ID=req, 보고서확정여부=True)
                 data.append({
                     'id': str(req.id),
                     'inspectionId': str(active.id),
@@ -101,7 +101,7 @@ class InspectionViewSet(viewsets.ViewSet):
                     'img': req.매물이미지URL,
                     'agentName': req.담당평가사ID.이름 if req.담당평가사ID else None
                 })
-            except ActiveInspection.DoesNotExist:
+            except InspectionProgress.DoesNotExist:
                 continue
 
         return Response({'reports': data})
@@ -113,8 +113,8 @@ class InspectionViewSet(viewsets.ViewSet):
         내 임장보고서 조회 (소비자용)
         """
         try:
-            active = ActiveInspection.objects.get(id=inspection_id, 보고서확정여부=True)
-        except ActiveInspection.DoesNotExist:
+            active = InspectionProgress.objects.get(id=inspection_id, 보고서확정여부=True)
+        except InspectionProgress.DoesNotExist:
             return Response({'error': 'Report not found or not confirmed'}, status=404)
 
         return Response({
@@ -201,8 +201,8 @@ class AdminInspectionViewSet(viewsets.ViewSet):
         inspection.수락일시 = timezone.now()
         inspection.save()
 
-        # ActiveInspection 생성
-        active = ActiveInspection.objects.create(
+        # 진행 생성
+        active = InspectionProgress.objects.create(
             요청ID=inspection,
             평가사ID=agent,
             진행률=0
@@ -236,7 +236,7 @@ class AdminInspectionViewSet(viewsets.ViewSet):
         진행중인 임장 목록
         """
         # 인증 비활성화 상태에서는 모든 진행중 임장 반환
-        active_inspections = ActiveInspection.objects.filter(
+        active_inspections = InspectionProgress.objects.filter(
             보고서확정여부=False
         ).select_related('요청ID')
 
@@ -250,7 +250,7 @@ class AdminInspectionViewSet(viewsets.ViewSet):
         완료된 임장 목록 조회
         """
         # 완료된 임장 조회 (보고서 확정된 것만)
-        completed_inspections = ActiveInspection.objects.filter(
+        completed_inspections = InspectionProgress.objects.filter(
             보고서확정여부=True
         ).select_related('요청ID', '평가사ID').order_by('-확정일시')
 
@@ -276,8 +276,8 @@ class AdminInspectionViewSet(viewsets.ViewSet):
         임장 취소
         """
         try:
-            active = ActiveInspection.objects.get(id=inspection_id)
-        except ActiveInspection.DoesNotExist:
+            active = InspectionProgress.objects.get(id=inspection_id)
+        except InspectionProgress.DoesNotExist:
             return Response({'error': 'Active inspection not found'}, status=404)
 
         reason = request.data.get('reason', '')
@@ -299,7 +299,7 @@ class AdminInspectionViewSet(viewsets.ViewSet):
             inspection_request.상태 = 'cancelled'
         inspection_request.save()
 
-        # ActiveInspection 삭제
+        # 진행 삭제
         active.delete()
 
         return Response({
@@ -314,27 +314,22 @@ class AdminInspectionViewSet(viewsets.ViewSet):
         평면도 저장 (JSON 데이터 + 이미지)
         """
         try:
-            active = ActiveInspection.objects.get(id=inspection_id)
-        except ActiveInspection.DoesNotExist:
+            progress = InspectionProgress.objects.get(id=inspection_id)
+        except InspectionProgress.DoesNotExist:
             return Response({'error': 'Active inspection not found'}, status=404)
 
-        # JSON 데이터 저장
-        floorplan_data = request.data.get('floorplanData')
-        if floorplan_data:
-            active.평면도데이터 = floorplan_data
-
-        # Base64 이미지 저장 (임시로 평면도URL에 Base64 직접 저장)
+        floorplan, _ = Floorplan.objects.get_or_create(임장ID=progress)
+        data = request.data.get('floorplanData')
+        if data:
+            floorplan.데이터 = data
         image_data = request.data.get('floorplanImage')
         if image_data:
-            # Base64 이미지를 직접 DB에 저장 (간단한 구현)
-            # 프로덕션에서는 S3나 별도 스토리지 사용 권장
-            active.평면도URL = image_data
-
-        active.save()
+            floorplan.이미지URL = image_data
+        floorplan.save()
 
         return Response({
             'success': True,
-            'floorplanURL': active.평면도URL,
+            'floorplanURL': floorplan.이미지URL,
             'message': '평면도가 저장되었습니다.'
         })
 
@@ -345,14 +340,28 @@ class AdminInspectionViewSet(viewsets.ViewSet):
         평면도 불러오기
         """
         try:
-            active = ActiveInspection.objects.get(id=inspection_id)
-        except ActiveInspection.DoesNotExist:
+            progress = InspectionProgress.objects.get(id=inspection_id)
+        except InspectionProgress.DoesNotExist:
             return Response({'error': 'Active inspection not found'}, status=404)
 
+        try:
+            floorplan = progress.floorplan
+        except Floorplan.DoesNotExist:
+            return Response({'floorplanData': None, 'floorplanURL': None})
+
         return Response({
-            'floorplanData': active.평면도데이터,
-            'floorplanURL': active.평면도URL
+            'floorplanData': floorplan.데이터,
+            'floorplanURL': floorplan.이미지URL
         })
+
+    @action(detail=True, methods=['delete'], url_path='(?P<inspection_id>[^/.]+)/floorplan')
+    def delete_floorplan(self, request, inspection_id=None):
+        try:
+            progress = InspectionProgress.objects.get(id=inspection_id)
+        except InspectionProgress.DoesNotExist:
+            return Response({'error': 'Active inspection not found'}, status=404)
+        Floorplan.objects.filter(임장ID=progress).delete()
+        return Response(status=204)
 
     @action(detail=True, methods=['post'], url_path='(?P<inspection_id>[^/.]+)/submit-report')
     def submit_report(self, request, inspection_id=None):
@@ -361,8 +370,8 @@ class AdminInspectionViewSet(viewsets.ViewSet):
         임장보고서 확정 제출
         """
         try:
-            active = ActiveInspection.objects.get(id=inspection_id)
-        except ActiveInspection.DoesNotExist:
+            active = InspectionProgress.objects.get(id=inspection_id)
+        except InspectionProgress.DoesNotExist:
             return Response({'error': 'Active inspection not found'}, status=404)
 
         # 보고서 데이터 저장
@@ -394,8 +403,8 @@ class AdminInspectionViewSet(viewsets.ViewSet):
         확정된 보고서 조회
         """
         try:
-            active = ActiveInspection.objects.get(id=inspection_id)
-        except ActiveInspection.DoesNotExist:
+            active = InspectionProgress.objects.get(id=inspection_id)
+        except InspectionProgress.DoesNotExist:
             return Response({'error': 'Active inspection not found'}, status=404)
 
         if not active.보고서확정여부:
@@ -418,8 +427,8 @@ class AdminInspectionViewSet(viewsets.ViewSet):
         진행 상황 저장 (체크리스트, 진행률)
         """
         try:
-            active = ActiveInspection.objects.get(id=inspection_id)
-        except ActiveInspection.DoesNotExist:
+            active = InspectionProgress.objects.get(id=inspection_id)
+        except InspectionProgress.DoesNotExist:
             return Response({'error': 'Active inspection not found'}, status=404)
 
         # 체크리스트 데이터 저장
@@ -446,11 +455,97 @@ class AdminInspectionViewSet(viewsets.ViewSet):
         진행 상황 불러오기
         """
         try:
-            active = ActiveInspection.objects.get(id=inspection_id)
-        except ActiveInspection.DoesNotExist:
+            active = InspectionProgress.objects.get(id=inspection_id)
+        except InspectionProgress.DoesNotExist:
             return Response({'error': 'Active inspection not found'}, status=404)
 
         return Response({
             'checklistData': active.체크리스트데이터,
             'progress': active.진행률
         })
+
+    # ------- 추가 목록 및 수정 엔드포인트 -------
+    @action(detail=False, methods=['get'], url_path='list-by-buffer')
+    def list_by_buffer(self, request):
+        try:
+            lat = float(request.query_params.get('lat'))
+            lng = float(request.query_params.get('lng'))
+            buf = float(request.query_params.get('buffer', '500'))
+        except (TypeError, ValueError):
+            return Response({'error': 'lat,lng,buffer 파라미터가 필요합니다.'}, status=400)
+
+        ddeg = buf / 111000.0
+        qs = InspectionRequest.objects.filter(
+            매물ID__위도__gte=lat - ddeg,
+            매물ID__위도__lte=lat + ddeg,
+            매물ID__경도__gte=lng - ddeg,
+            매물ID__경도__lte=lng + ddeg,
+        ).order_by('-요청일시')
+
+        data = [
+            {
+                'id': str(x.id),
+                'title': x.매물제목,
+                'address': x.매물주소,
+                'priceText': x.가격정보,
+                'preferredDate': x.희망날짜,
+            }
+            for x in qs
+        ]
+        return Response({'requests': data})
+
+    @action(detail=False, methods=['get'], url_path='list-by-requester')
+    def list_by_requester(self, request):
+        email = request.query_params.get('email')
+        qs = InspectionRequest.objects.all()
+        if email:
+            qs = qs.filter(요청자ID__user__username=email)
+        data = [
+            {
+                'id': str(x.id),
+                'title': x.매물제목,
+                'address': x.매물주소,
+                'preferredDate': x.희망날짜,
+            }
+            for x in qs.order_by('-요청일시')
+        ]
+        return Response({'requests': data})
+
+    @action(detail=False, methods=['get'], url_path='list-by-agent')
+    def list_by_agent(self, request):
+        email = request.query_params.get('email')
+        qs = InspectionRequest.objects.filter(담당평가사ID__isnull=False)
+        if email:
+            qs = qs.filter(담당평가사ID__사용자ID__user__username=email)
+        data = [
+            {
+                'id': str(x.id),
+                'title': x.매물제목,
+                'address': x.매물주소,
+                'preferredDate': x.희망날짜,
+                'activeId': getattr(getattr(x, 'active_inspection', None), 'id', None),
+            }
+            for x in qs.order_by('-요청일시')
+        ]
+        return Response({'requests': data})
+
+    @action(detail=True, methods=['patch'], url_path='requests/(?P<request_id>[^/.]+)')
+    def update_request(self, request, request_id=None):
+        try:
+            req = InspectionRequest.objects.get(id=request_id)
+        except InspectionRequest.DoesNotExist:
+            return Response({'error': 'Not found'}, status=404)
+        fields = {
+            '매물제목': 'title',
+            '매물주소': 'address',
+            '가격정보': 'priceText',
+            '매물이미지URL': 'img',
+            '희망날짜': 'preferred_date',
+            '연락처': 'contact_phone',
+            '요청사항': 'request_note',
+        }
+        for model_field, payload in fields.items():
+            if payload in request.data:
+                setattr(req, model_field, request.data.get(payload))
+        req.save()
+        return Response({'success': True})

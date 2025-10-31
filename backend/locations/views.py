@@ -16,7 +16,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from .models import Sido
+from .models import Sido, BusStop
 from .serializers import SidoSerializer, DEFAULT_SIMPLIFY_TOLERANCE
 from .tasks import generate_sido_topojson, clear_topojson_cache
 from .signals import invalidate_topojson_cache_manually
@@ -272,3 +272,35 @@ def topojson_sido_status_api(request):
             'status': 'error',
             'message': f'상태 확인 오류: {str(e)}'
         }, status=500)
+
+
+def bus_list_api(request):
+    """
+    GET /api/locations/bus/list?lat=..&lng=..&buffer=..(미터)
+    간단한 위경도 박스 필터로 근접 버스정류장 리스트 반환(목업)
+    """
+    try:
+        lat = float(request.GET.get('lat'))
+        lng = float(request.GET.get('lng'))
+        buf = float(request.GET.get('buffer', '500'))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'lat,lng,buffer 파라미터가 필요합니다.'}, status=400)
+
+    ddeg = buf / 111000.0
+    qs = BusStop.objects.filter(
+        위치__y__gte=lat - ddeg,
+        위치__y__lte=lat + ddeg,
+        위치__x__gte=lng - ddeg,
+        위치__x__lte=lng + ddeg,
+    )[:200]
+
+    results = [
+        {
+            'id': s.정류장번호,
+            'name': s.정류장명,
+            'lat': s.위도,
+            'lng': s.경도,
+        }
+        for s in qs
+    ]
+    return JsonResponse({'stops': results})
