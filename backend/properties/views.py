@@ -4,6 +4,8 @@ from rest_framework.permissions import AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Property
 from .serializers import PropertyListSerializer, PropertyDetailSerializer
+from rest_framework.decorators import action
+from locations.models import BusStop
 
 
 class PropertyViewSet(viewsets.ModelViewSet):
@@ -27,6 +29,39 @@ class PropertyViewSet(viewsets.ModelViewSet):
         if self.action == 'list':
             return PropertyListSerializer
         return PropertyDetailSerializer
+
+    @action(detail=True, methods=['get'], url_path='bus-score')
+    def bus_score(self, request, pk=None):
+        """
+        GET /api/properties/{id}/bus-score?buffer=500
+        근처 버스정류장 기반 점수 산출(간단한 규칙)
+        """
+        try:
+            prop = self.get_queryset().get(pk=pk)
+        except Property.DoesNotExist:
+            return Response({'error': 'Not found'}, status=404)
+
+        buf = float(request.query_params.get('buffer', '500'))
+        if prop.위도 is None or prop.경도 is None:
+            return Response({'score': 0, 'stops': []})
+        lat = float(prop.위도)
+        lng = float(prop.경도)
+        ddeg = buf / 111000.0
+        qs = BusStop.objects.filter(
+            위치__y__gte=lat - ddeg,
+            위치__y__lte=lat + ddeg,
+            위치__x__gte=lng - ddeg,
+            위치__x__lte=lng + ddeg,
+        )[:200]
+
+        count = qs.count()
+        # 단순 점수: 개수 기반 0~100 스케일링
+        score = max(0, min(100, int((count / 20) * 100)))
+        stops = [
+            {'id': s.정류장번호, 'name': s.정류장명, 'lat': s.위도, 'lng': s.경도}
+            for s in qs
+        ]
+        return Response({'score': score, 'count': count, 'stops': stops})
     
     def list(self, request, *args, **kwargs):
         """

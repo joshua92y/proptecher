@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import InspectionRequest, ActiveInspection, InspectionCancellation
+from .models import InspectionRequest, InspectionProgress, InspectionCancellation
 
 
 class InspectionRequestCreateSerializer(serializers.ModelSerializer):
@@ -26,12 +26,12 @@ class InspectionRequestCreateSerializer(serializers.ModelSerializer):
         listing_id = validated_data.pop('listing_id', None)
         user = self.context['request'].user
 
-        # Listing 객체 조회
-        from listings.models import Listing
+        # Property 객체 조회 (기존 listings 통합)
+        from properties.models import Property
         try:
-            listing = Listing.objects.get(id=listing_id)
+            listing = Property.objects.get(id=listing_id)
             validated_data['매물ID'] = listing
-        except Listing.DoesNotExist:
+        except Property.DoesNotExist:
             raise serializers.ValidationError("매물을 찾을 수 없습니다.")
 
         # 요청자 설정
@@ -104,7 +104,7 @@ class ActiveInspectionSerializer(serializers.ModelSerializer):
     img = serializers.CharField(source='요청ID.매물이미지URL', allow_null=True)
 
     class Meta:
-        model = ActiveInspection
+        model = InspectionProgress
         fields = ['id', 'requestId', 'title', 'address', 'priceText', 'progress', 'img']
 
 

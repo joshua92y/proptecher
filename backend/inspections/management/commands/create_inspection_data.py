@@ -18,7 +18,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        from listings.models import Listing
+        from properties.models import Property
         from users.models import UserProfile
         from agents.models import Agent
         from inspections.models import InspectionRequest, ActiveInspection
@@ -27,7 +27,7 @@ class Command(BaseCommand):
         count = options['count']
         
         # 매물 가져오기
-        listings = list(Listing.objects.all()[:20])
+        listings = list(Property.objects.all()[:20])
         if not listings:
             self.stdout.write(self.style.WARNING('매물이 없습니다. 먼저 매물 데이터를 생성하세요.'))
             return

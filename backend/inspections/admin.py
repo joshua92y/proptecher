@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import InspectionRequest, ActiveInspection, InspectionCancellation
+from .models import InspectionRequest, InspectionProgress, InspectionCancellation
 
 
 @admin.register(InspectionRequest)
@@ -44,7 +44,7 @@ class InspectionRequestAdmin(admin.ModelAdmin):
         )
 
 
-@admin.register(ActiveInspection)
+@admin.register(InspectionProgress)
 class ActiveInspectionAdmin(admin.ModelAdmin):
     """
     진행중인 임장 관리자 페이지
