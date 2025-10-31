@@ -132,8 +132,9 @@ const formatPrice = (won: number): string => {
   return rest > 0 ? `${eok}억 ${rest.toLocaleString()}` : `${eok}억`;
 };
 
-function makePriceText(api: ApiListing): string {
-  switch (api.listing_type) {
+function makePriceText(api: ApiListing, leaseTypeKorean?: "전세" | "월세" | "매매"): string {
+  const typeToUse = leaseTypeKorean || api.listing_type;
+  switch (typeToUse) {
     case "전세":
       return api.jeonse_price != null ? formatPrice(api.jeonse_price) : "-";
     case "월세":
@@ -188,10 +189,22 @@ export function toVM(api: ApiListing): ListingDetailVM {
     : "-";
   const supplyAreaText = toAreaText(supplyAreaSqm);
 
+  // 매물 타입을 한국어로 변환
+  const getLeaseTypeKorean = (type: string): "전세" | "월세" | "매매" => {
+    switch (type) {
+      case 'jeonse': return '전세';
+      case 'monthly': return '월세';
+      case 'sale': return '매매';
+      default: return '전세'; // 기본값
+    }
+  };
+
+  const leaseTypeKorean = getLeaseTypeKorean(api.listing_type);
+
   return {
     heroImages: api.images && api.images.length > 0 ? api.images : [],
-    leaseType: api.listing_type,
-    priceText: makePriceText(api),
+    leaseType: leaseTypeKorean,
+    priceText: makePriceText(api, leaseTypeKorean),
     address: api.address,
     adminFeeText: toCurrencyShort(api.maintenance_fee_monthly),
     parking: api.parking_info || null,
@@ -255,6 +268,7 @@ export type ListingListItem = {
   lng: number;
   img: string | null;
   type?: string; // 주택 종류 (apartment, officetel, villa, oneroom, tworoom 등)
+  exclusive_area_pyeong?: number; // 전용면적(평)
 };
 
 export type ListingsResponse = {
@@ -265,18 +279,57 @@ export type ListingsResponse = {
 export async function getListings(bounds?: string): Promise<ListingListItem[]> {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const url = bounds 
+    const url = bounds
       ? `${apiUrl}/api/properties/?bounds=${bounds}`
       : `${apiUrl}/api/properties/`;
-    
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`Failed to fetch properties: ${res.status}`);
-    
+
+    console.log('Fetching listings from:', url);
+
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      // CORS 관련 설정 추가
+      mode: 'cors',
+    });
+
+    if (!res.ok) {
+      console.error(`API request failed with status ${res.status}: ${res.statusText}`);
+      throw new Error(`Failed to fetch properties: ${res.status} ${res.statusText}`);
+    }
+
     const json: any = await res.json();
+    console.log('API response:', json);
+
     // API 응답이 {properties: [...]} 형태이므로 변환
-    return json.properties || json.listings || [];
+    const properties = json.properties || json.listings || json || [];
+
+    if (!Array.isArray(properties)) {
+      console.error('API response is not an array:', properties);
+      return [];
+    }
+
+    // API에서 문자열로 오는 숫자 필드들을 변환
+    return properties.map((property: any) => ({
+      ...property,
+      lat: parseFloat(property.lat) || 0,
+      lng: parseFloat(property.lng) || 0,
+      exclusive_area_pyeong: property.exclusive_area_pyeong ? parseFloat(property.exclusive_area_pyeong) : undefined
+    }));
   } catch (error) {
     console.error('Failed to fetch properties from API:', error);
+
+    // 개발 환경에서 더 자세한 에러 정보 출력
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      });
+    }
+
     // 폴백: 빈 배열 반환
     return [];
   }
@@ -294,7 +347,7 @@ export async function getListingDetailVM(id: string): Promise<ListingDetailVM | 
     console.error('Failed to fetch property detail from API:', error);
     // 폴백(mock) — 개발 편의용
     const mock: ApiListing = {
-      listing_type: "전세",
+      listing_type: "jeonse",
       jeonse_price: 320_000_000,
 
       address: "서울특별시 강남구 테헤란로 123",

@@ -1,14 +1,34 @@
 "use client";
 
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styled, { keyframes } from "styled-components";
 import MobileLayout from "@/components/MobileLayout";
 
 export default function Home() {
   const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+      const name = typeof window !== 'undefined' ? localStorage.getItem('userName') : null;
+      // 로그인 여부는 토큰 기준으로만 판단
+      setIsLoggedIn(!!token);
+      setUserName(name);
+    } catch (_) {
+      setIsLoggedIn(false);
+      setUserName(null);
+    }
+  }, []);
 
   // 새로운 홈페이지 기능
   const handlePlusClick = () => {
+    if (!isLoggedIn) {
+      router.push('/mypage');
+      return;
+    }
     router.push('/properties');
   };
 
@@ -21,87 +41,130 @@ export default function Home() {
       <div>
         {/* 새로운 홈페이지 디자인 */}
         <NewHomeContainer>
-          {/* Header */}
-          <NewHeader>
-            <NewLogo>이주메이트</NewLogo>
-            <NewHeaderActions>
-              <NewIconButton>
-                <SearchIcon>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </SearchIcon>
-                <IconLabel>검색하기</IconLabel>
-              </NewIconButton>
-              <NewIconButton>
-                <ChatIcon>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </ChatIcon>
-                <IconLabel>챗봇 상담</IconLabel>
-              </NewIconButton>
-            </NewHeaderActions>
-          </NewHeader>
+          {/* 상단 고정 네비게이션(MobileLayout 내 TopNav)만 사용. 중복 헤더 제거 */}
 
           {/* Main Content */}
           <NewMainContent>
-            {/* Welcome Card */}
-            <WelcomeCard>
-              <WelcomeContent>
-                <WelcomeAvatar />
-                <WelcomeText>
-                  <WelcomeGreeting>
-                    안녕하세요, <WelcomeName>주영</WelcomeName> 님!
-                  </WelcomeGreeting>
-                  <ProgressSection>
-                    <ProgressBar>
-                      <ProgressFill style={{width: '57%'}} />
-                    </ProgressBar>
-                    <ProgressText>57%</ProgressText>
-                  </ProgressSection>
-                </WelcomeText>
-              </WelcomeContent>
-            </WelcomeCard>
+            {/* 반응형 섹션 (요구안 디자인을 유사하게, flex/grid 기반) */}
+            <SectionContainer>
+              {/* 상단 네비와 중복되는 컨텐츠 헤더 제거 */}
 
-            {/* Add Friend Section */}
-            <Section>
-              <SectionTitle>지원님을 위한 이주메이트</SectionTitle>
-              <ActionCard>
-                <PlusButton onClick={handlePlusClick}>
-                  <PlusIcon>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" />
-                  </PlusIcon>
-                </PlusButton>
-                <ActionText>이사갈 집을 찾아보세요!</ActionText>
-              </ActionCard>
-            </Section>
+              <GreetingCard>
+                <GreetingAvatar />
+                <div>
+                  <GreetingText>
+                    {isLoggedIn ? (
+                      <>안녕하세요, <WelcomeName>{userName || '사용자'}</WelcomeName> 님!</>
+                    ) : (
+                      <>로그인 또는 회원가입이 필요합니다</>
+                    )}
+                  </GreetingText>
+                  {isLoggedIn && (
+                    <GreetingProgress>
+                      <GreetingBar>
+                        <GreetingFill style={{ width: '57%' }} />
+                      </GreetingBar>
+                      <GreetingPercent>57%</GreetingPercent>
+                    </GreetingProgress>
+                  )}
+                </div>
+              </GreetingCard>
 
-            {/* Recommendations Section */}
-            <Section>
-              <SectionHeader>
-                <SectionTitle>지원님께 딱 맞는 지원 정책 추천</SectionTitle>
-                <ArrowButton>
-                  <ArrowIcon>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                  </ArrowIcon>
-                </ArrowButton>
-              </SectionHeader>
+              {isLoggedIn ? (
+                <>
+                  <HeadingRow>
+                    <SectionTitleAlt>{userName}님을 위한 이주메이트</SectionTitleAlt>
+                    <Chevron>›</Chevron>
+                  </HeadingRow>
+                  <RecommendHorizontal>
+                    <RecommendImg />
+                    <div>
+                      <RecommendName>전북 무주군 무주읍 적천로 343</RecommendName>
+                      <RecommendPrice>전세 2000/90</RecommendPrice>
+                      <RecommendCTA>자세히 보기</RecommendCTA>
+                    </div>
+                  </RecommendHorizontal>
+                </>
+              ) : (
+                <LoginPromptSection>
+                  <LoginPromptTitle>로그인하고 맞춤 매물을 추천받아보세요</LoginPromptTitle>
+                  <LoginPromptDesc>회원가입으로 이주메이트의 모든 기능을 이용해보세요</LoginPromptDesc>
+                  <LoginPromptButton onClick={() => router.push('/login')}>
+                    로그인하기
+                  </LoginPromptButton>
+                </LoginPromptSection>
+              )}
 
-              <RecommendationCards>
-                <RecommendationCard onClick={handleCardClick}>
-                  <CardImage />
-                  <CardContent>
-                    <CardTitle>지방으로 가면 200만원 드려요!</CardTitle>
-                    <CardDescription>수도권에서 지방으로 이주 시 정부에서 200만원을 지원해주는 정책안을 미련</CardDescription>
-                  </CardContent>
-                </RecommendationCard>
+              {isLoggedIn ? (
+                <>
+                  <HeadingRow>
+                    <SectionTitleAlt>{userName}님을 위한 이주메이트</SectionTitleAlt>
+                    <Chevron>›</Chevron>
+                  </HeadingRow>
+                  <TwoGrid>
+                    <PartnerBox>
+                      <PartnerText>정책 파트너와 대화하기</PartnerText>
+                    </PartnerBox>
+                    <PartnerBox>
+                      <PartnerText>현지 조력자와 대화하기</PartnerText>
+                    </PartnerBox>
+                  </TwoGrid>
+                </>
+              ) : null}
 
-                <RecommendationCard onClick={handleCardClick}>
-                  <CardImage />
-                  <CardContent>
-                    <CardTitle>지방으로 가면 200만원 드려요!</CardTitle>
-                    <CardDescription>수도권에서 지방으로 이주 시 정부에서</CardDescription>
-                  </CardContent>
-                </RecommendationCard>
-              </RecommendationCards>
-            </Section>
+              {isLoggedIn && (
+                <>
+                  <HeadingRow>
+                    <SectionTitleAlt>{userName}님의 정주 완주율</SectionTitleAlt>
+                    <Chevron>›</Chevron>
+                  </HeadingRow>
+                  <GreetingCard>
+                    <GreetingContent>
+                      <GreetingBar>
+                        <GreetingFill style={{ width: '57%' }} />
+                      </GreetingBar>
+                      <GreetingPercent>57%</GreetingPercent>
+                    </GreetingContent>
+                  </GreetingCard>
+                </>
+              )}
+              {isLoggedIn && (
+                <StackedList>
+                  <InfoRow>
+                    <InfoSquare style={{ background: '#FFD9A4' }} />
+                    <div>
+                      <InfoHeading>주거지</InfoHeading>
+                      <InfoParagraph>어쩌고 저쩌고 진행중입니다</InfoParagraph>
+                    </div>
+                    <RightBadge>
+                      <Ring percent={38} color="#E9A547"><RingInner /><RingLabel>38%</RingLabel></Ring>
+                    </RightBadge>
+                  </InfoRow>
+                  <InfoRow>
+                    <InfoSquare style={{ background: '#D2F4A2' }} />
+                    <div>
+                      <InfoHeading>일자리 지원</InfoHeading>
+                      <InfoParagraph>어쩌고 저쩌고 진행중입니다</InfoParagraph>
+                    </div>
+                    <RightBadge>
+                      <Ring percent={54} color="#8FC83E"><RingInner /><RingLabel>54%</RingLabel></Ring>
+                    </RightBadge>
+                  </InfoRow>
+                  <InfoRow>
+                    <InfoSquare style={{ background: '#D9E5FF' }} />
+                    <div>
+                      <InfoHeading>국가 지원 정책</InfoHeading>
+                      <InfoParagraph>어쩌고 저쩌고 진행중입니다</InfoParagraph>
+                    </div>
+                    <RightBadge>
+                      <Ring percent={54} color="#6C8FD9"><RingInner /><RingLabel>54%</RingLabel></Ring>
+                    </RightBadge>
+                  </InfoRow>
+                </StackedList>
+              )}
+            </SectionContainer>
+
+            {/* (기존 중복 섹션 제거: 최신 반응형 섹션만 유지) */}
           </NewMainContent>
         </NewHomeContainer>
 
@@ -117,64 +180,7 @@ const NewHomeContainer = styled.div`
   background: linear-gradient(180deg, #e8f0f7 0%, #f5f8fa 100%);
 `;
 
-const NewHeader = styled.header`
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  padding: 16px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-`;
-
-const NewLogo = styled.h1`
-  font-size: 20px;
-  font-weight: 700;
-  color: #111;
-  margin: 0;
-`;
-
-const NewHeaderActions = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 24px;
-`;
-
-const NewIconButton = styled.button`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-
-  &:hover {
-    opacity: 0.7;
-  }
-`;
-
-const SearchIcon = styled.svg`
-  width: 28px;
-  height: 28px;
-  color: #6b7280;
-`;
-
-const ChatIcon = styled.svg`
-  width: 28px;
-  height: 28px;
-  color: #6b7280;
-`;
-
-const IconLabel = styled.span`
-  font-size: 11px;
-  color: #6b7280;
-  font-weight: 500;
-`;
+/* NewHeader/Logo/Actions 아이콘 영역 제거 */
 
 const NewMainContent = styled.main`
   max-width: 1200px;
@@ -246,6 +252,33 @@ const ProgressText = styled.span`
   font-size: 20px;
   font-weight: 700;
   color: #374151;
+`;
+
+const CTAButtons = styled.div`
+  display: flex;
+  gap: 12px;
+`;
+
+const CTAButtonPrimary = styled.button`
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+`;
+
+const CTAButton = styled.button`
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
 `;
 
 const Section = styled.section`
@@ -324,6 +357,102 @@ const ArrowIcon = styled.svg`
   height: 24px;
 `;
 
+// ===== 반응형 섹션 스타일 =====
+const SectionContainer = styled.section`
+  background: #E6F0F8; border-radius: 10px; padding: 16px; margin-bottom: 24px;
+`;
+/* 중복 헤더 컴포넌트 삭제 */
+const GreetingCard = styled.div`
+  background: #fff; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  padding: 16px; display: flex; gap: 16px; align-items: center; margin-bottom: 16px;
+`;
+const GreetingAvatar = styled.div`
+  width: 74px; height: 74px; border-radius: 50%; background: #E6F0F8;
+`;
+const GreetingText = styled.div`
+  font-size: 20px; font-weight: 500; color: #737373;
+`;
+const GreetingProgress = styled.div`
+  display: flex; align-items: center; gap: 12px; margin-top: 8px;
+`;
+const GreetingContent = styled.div`
+  flex: 1;
+`;
+const GreetingBar = styled.div`
+  width: 50%; height: 12px; background: #EEEDED; border-radius: 5px; overflow: hidden;
+`;
+const GreetingFill = styled.div`
+  height: 100%; background: #3394E2;
+`;
+const GreetingPercent = styled.span`
+  font-size: 18px; font-weight: 500; color: #737373;
+`;
+const SectionTitleAlt = styled.h3`
+  font-size: 20px; font-weight: 500; color: #000; margin: 12px 0;
+`;
+const RecommendHorizontal = styled.div`
+  display: grid; grid-template-columns: 114px 1fr; gap: 16px; align-items: center;
+  background: #fff; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 16px;
+`;
+const RecommendImg = styled.div`
+  width: 114px; height: 114px; background: #d9d9d9; border-radius: 10px;
+`;
+const RecommendName = styled.div`
+  font-size: 16px; font-weight: 600; color: #000; line-height: 1.8;
+`;
+const RecommendPrice = styled.div`
+  font-size: 16px; color: #868686;
+`;
+const RecommendCTA = styled.button`
+  margin-top: 8px; width: 136px; height: 41px; border-radius: 10px; background: #fff; border: 1px solid #BFBFBF; color: #353535;
+`;
+const HeadingRow = styled.div`
+  display:flex; align-items:center; justify-content:space-between; margin: 16px 0 8px;
+`;
+const Chevron = styled.span`
+  font-size: 22px; color: #8F8F8F; line-height: 1;
+`;
+const TwoGrid = styled.div`
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;
+`;
+const PartnerBox = styled.div`
+  background: #fff; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 24px; min-height: 132px;
+  display: flex; align-items: center;
+`;
+const PartnerText = styled.div`
+  font-size: 16px; font-weight: 600; color: #000; line-height: 1.3;
+`;
+const StackedList = styled.div`
+  display: grid; gap: 12px; margin-top: 8px;
+`;
+const InfoRow = styled.div`
+  display: grid; grid-template-columns: 73px 1fr 80px; gap: 16px; align-items: center; background: #fff;
+  border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 16px;
+`;
+const InfoSquare = styled.div`
+  width: 73px; height: 73px; border-radius: 10px;
+`;
+const InfoHeading = styled.div`
+  font-size: 16px; font-weight: 600; color: #000;
+`;
+const InfoParagraph = styled.div`
+  font-size: 14px; font-weight: 300; color: #000; margin-top: 6px;
+`;
+const RightBadge = styled.div`
+  display:flex; justify-content:flex-end;
+`;
+const Ring = styled.div<{percent:number; color:string}>`
+  position: relative; width: 72px; height:72px; border-radius: 50%;
+  background: conic-gradient(${p=>p.color} ${p=>p.percent*3.6}deg, #E6EEF6 0deg);
+  display:grid; place-items:center;
+`;
+const RingInner = styled.div`
+  width:58px; height:58px; border-radius:50%; background:#fff; border:2px solid #fff;
+`;
+const RingLabel = styled.div`
+  position:absolute; font-size:18px; font-weight:600; color:#000;
+`;
+
 const RecommendationCards = styled.div`
   display: flex;
   flex-direction: column;
@@ -370,6 +499,46 @@ const CardDescription = styled.p`
   color: #6b7280;
   line-height: 1.5;
   margin: 0;
+`;
+
+const LoginPromptSection = styled.div`
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  text-align: center;
+`;
+
+const LoginPromptTitle = styled.h3`
+  font-size: 18px;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 8px 0;
+`;
+
+const LoginPromptDesc = styled.p`
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.5;
+  margin: 0 0 20px 0;
+`;
+
+const LoginPromptButton = styled.button`
+  background: #2F80ED;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  max-width: 200px;
+
+  &:active {
+    background: #2563eb;
+  }
 `;
 
 // 애니메이션

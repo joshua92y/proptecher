@@ -21,7 +21,7 @@ export default function ListingsPage() {
 
   /** 지도 상태 */
   const [bounds, setBounds] = useState<Bounds | null>(null);
-  const initialCenter = useRef<{ lat: number; lng: number }>({ lat: 35.0, lng: 127.0 });
+  const initialCenter = useRef<{ lat: number; lng: number }>({ lat: 36.5, lng: 127.5 });
   const [centerAddress, setCenterAddress] = useState<string>("위치 확인 중...");
   const [showTopNav, setShowTopNav] = useState(false);
 
@@ -85,6 +85,7 @@ export default function ListingsPage() {
       },
       title: listing.title,
       price: listing.price,
+      exclusive_area_pyeong: listing.exclusive_area_pyeong,
     }));
   }, [allListings]);
 
@@ -177,7 +178,7 @@ export default function ListingsPage() {
       window.addEventListener('mouseup', handleDragEnd);
       window.addEventListener('touchmove', handleDragMove);
       window.addEventListener('touchend', handleDragEnd);
-      
+
       return () => {
         window.removeEventListener('mousemove', handleDragMove);
         window.removeEventListener('mouseup', handleDragEnd);
@@ -187,8 +188,24 @@ export default function ListingsPage() {
     }
   }, [isDragging, handleDragMove, handleDragEnd]);
 
+  /** 지도 빈 곳 클릭 이벤트 리스너 */
+  useEffect(() => {
+    const handleMapEmptyClick = () => {
+      // 모달을 기본 크기로 축소
+      setModalHeight(30);
+      // 선택 해제
+      setSelectedId(null);
+    };
+
+    window.addEventListener('mapEmptyClick', handleMapEmptyClick);
+
+    return () => {
+      window.removeEventListener('mapEmptyClick', handleMapEmptyClick);
+    };
+  }, []);
+
   /** 리스트 아이템 클릭 시: 상세 페이지 이동 */
-  const goDetail = (id: string) => router.push(`/listings/${id}`);
+  const goDetail = (id: string) => router.push(`/properties/${id}`);
 
   return (
     <>
@@ -206,6 +223,18 @@ export default function ListingsPage() {
 
       {/* 전체 화면 지도 */}
       <MapWrap>
+        {/* 관심 지역 매물 보기 버튼 */}
+        <FavButton 
+          $navVisible={showTopNav}
+          onClick={(e) => { e.stopPropagation(); alert('관심 지역 기능은 목업입니다'); }}
+        >
+          <FavIcon>⭐</FavIcon>
+          관심 지역 매물 보기
+        </FavButton>
+        {/* 현재 위치 버튼 */}
+        <LocateBtn onClick={(e)=>{ e.stopPropagation(); /* TODO: geolocation */ }}>
+          ⊕
+        </LocateBtn>
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
             로딩 중...
@@ -214,7 +243,7 @@ export default function ListingsPage() {
           <KakaoMap
             key="kakao-map"
             center={initialCenter.current}
-            level={6}
+            level={12}
             markers={mapMarkers}
             onMarkerClick={handleMarkerClick}
             onBoundsChanged={handleBoundsChanged}
@@ -274,7 +303,7 @@ export default function ListingsPage() {
           <NavIcon>🏠</NavIcon>
           <NavLabel>홈</NavLabel>
         </BottomNavItem>
-        <BottomNavItem onClick={() => router.push("/listings")} $active={true}>
+        <BottomNavItem onClick={() => router.push("/properties")} $active={true}>
           <NavIcon>🏘️</NavIcon>
           <NavLabel>부동산</NavLabel>
         </BottomNavItem>
@@ -315,6 +344,27 @@ const MapWrap = styled.section`
   width: 100%;
   height: 100%;
   z-index: 1;
+`;
+
+const FavButton = styled.button<{ $navVisible: boolean }>`
+  position: absolute; 
+  top: ${(p) => (p.$navVisible ? '80px' : '20px')};
+  left: 16px; 
+  z-index: 2;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 12px 16px; font-weight: 800; color:#374151;
+  box-shadow: 0 6px 18px rgba(0,0,0,.08);
+  display: flex; align-items:center; gap: 10px;
+  transition: top .25s cubic-bezier(.2,.8,.2,1), box-shadow .2s ease;
+`;
+
+const FavIcon = styled.span`
+  color: #f59e0b; font-size: 18px;
+`;
+
+const LocateBtn = styled.button`
+  position: absolute; right: 16px; bottom: 100px; z-index: 2;
+  width: 56px; height: 56px; border-radius: 16px; border: none; background: #2F80ED; color: #fff; font-size: 22px; font-weight: 800;
+  box-shadow: 0 8px 18px rgba(47,128,237,.35);
 `;
 
 // 커스텀 상단바

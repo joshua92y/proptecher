@@ -2,10 +2,41 @@
 
 import styled from "styled-components";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import MobileLayout from "@/components/MobileLayout";
 
 export default function MyPage() {
   const router = useRouter();
+  const [userName, setUserName] = useState<string>("게스트");
+  const [userEmail, setUserEmail] = useState<string>("guest@example.com");
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("authToken");
+      const name = localStorage.getItem("userName");
+      const email = localStorage.getItem("userEmail");
+
+      if (token && name && email) {
+        setUserName(name);
+        setUserEmail(email);
+        setIsLoggedIn(true);
+      }
+    }
+  }, []);
+
+  const handleLogout = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("userName");
+      localStorage.removeItem("userEmail");
+      localStorage.removeItem("userType");
+    }
+    setUserName("게스트");
+    setUserEmail("guest@example.com");
+    setIsLoggedIn(false);
+    router.replace("/");
+  };
 
   const menuItems = [
     { id: "inspections", label: "내 임장보고서", icon: "📋", path: "/mypage/inspections" },
@@ -21,9 +52,13 @@ export default function MyPage() {
       <Container>
         <ProfileSection>
           <ProfileImage>👤</ProfileImage>
-          <ProfileName>게스트</ProfileName>
-          <ProfileEmail>guest@example.com</ProfileEmail>
-          <LoginButton>로그인 / 회원가입</LoginButton>
+          <ProfileName>{userName}</ProfileName>
+          <ProfileEmail>{userEmail}</ProfileEmail>
+          {!isLoggedIn ? (
+            <LoginButton onClick={() => router.push("/login")}>로그인 / 회원가입</LoginButton>
+          ) : (
+            <ProfileStatus>로그인됨</ProfileStatus>
+          )}
         </ProfileSection>
 
         <MenuSection>
@@ -43,10 +78,12 @@ export default function MyPage() {
           ))}
         </MenuSection>
 
-        <Footer>
-          <FooterButton>로그아웃</FooterButton>
-          <FooterButton>회원탈퇴</FooterButton>
-        </Footer>
+        {isLoggedIn && (
+          <Footer>
+            <FooterButton onClick={handleLogout}>로그아웃</FooterButton>
+            <FooterButton>회원탈퇴</FooterButton>
+          </Footer>
+        )}
       </Container>
     </MobileLayout>
   );
@@ -102,6 +139,16 @@ const LoginButton = styled.button`
   &:active {
     background: #f5f5ff;
   }
+`;
+
+const ProfileStatus = styled.div`
+  padding: 12px 32px;
+  border-radius: 8px;
+  background: #e8f5e8;
+  color: #2e7d2e;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
 `;
 
 const MenuSection = styled.div`
