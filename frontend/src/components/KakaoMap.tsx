@@ -13,6 +13,7 @@ export interface MapMarker {
   };
   title: string;
   price?: string;
+  exclusive_area_pyeong?: number; // 전용면적(평)
   onClick?: (id: string) => void;
 }
 
@@ -66,14 +67,74 @@ export default function KakaoMap({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const overlaysRef = useRef<any[]>([]);
   const clustererRef = useRef<any>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [currentZoomLevel, setCurrentZoomLevel] = useState(initialLevel);
   const onBoundsChangedRef = useRef(onBoundsChanged);
+  const onMarkerClickRef = useRef(onMarkerClick);
 
-  // onBoundsChanged가 변경되면 ref 업데이트
+  // 콜백 함수들이 변경되면 ref 업데이트
   useEffect(() => {
     onBoundsChangedRef.current = onBoundsChanged;
   }, [onBoundsChanged]);
+
+  useEffect(() => {
+    onMarkerClickRef.current = onMarkerClick;
+  }, [onMarkerClick]);
+
+  // 인포윈도우 및 지도 클릭 이벤트 리스너
+  useEffect(() => {
+    const handleMarkerClick = (event: any) => {
+      const markerId = event.detail;
+      if (onMarkerClickRef.current) {
+        onMarkerClickRef.current(markerId);
+      }
+    };
+
+    const handleMapClick = () => {
+      // 지도 빈 곳 클릭 시 이벤트 발생
+      window.dispatchEvent(new CustomEvent('mapEmptyClick'));
+    };
+
+    const handleFocusRegion = (ev: any) => {
+      if (!mapRef.current || !window.kakao?.maps?.services) return;
+      const regionName = ev.detail as string;
+      const geocoder = new window.kakao.maps.services.Geocoder();
+      geocoder.addressSearch(regionName, (result: any, status: any) => {
+        if (status === window.kakao.maps.services.Status.OK && result && result[0]) {
+          const { x, y } = result[0];
+          const latLng = new window.kakao.maps.LatLng(parseFloat(y), parseFloat(x));
+          // 간단한 확대 레벨 추정: 광역권은 9, 시/구는 7, 동/면은 5
+          const lvl = /도$|특별시$|광역시$|자치시$|^서울|^경기|^인천|^부산|^대구|^광주|^대전|^울산|^세종/.test(regionName) ? 9
+            : /시$|구$|군$/.test(regionName) ? 7 : 5;
+          mapRef.current.setLevel(lvl);
+          mapRef.current.setCenter(latLng);
+        }
+      });
+    };
+
+    const handleFitBounds = (ev: any) => {
+      if (!mapRef.current || !window.kakao) return;
+      const points = (ev.detail || []) as Array<{ lat: number; lng: number }>;
+      if (!points || points.length === 0) return;
+      const bounds = new window.kakao.maps.LatLngBounds();
+      points.forEach((p) => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
+      mapRef.current.setBounds(bounds);
+    };
+
+    window.addEventListener('markerClick', handleMarkerClick);
+    window.addEventListener('mapClick', handleMapClick);
+    window.addEventListener('focusRegion', handleFocusRegion as EventListener);
+    window.addEventListener('fitBounds', handleFitBounds as EventListener);
+
+    return () => {
+      window.removeEventListener('markerClick', handleMarkerClick);
+      window.removeEventListener('mapClick', handleMapClick);
+      window.removeEventListener('focusRegion', handleFocusRegion as EventListener);
+      window.removeEventListener('fitBounds', handleFitBounds as EventListener);
+    };
+  }, []); // 의존성 제거하여 매번 리렌더링 방지
 
   // 카카오맵 SDK 로드 및 지도 초기화 (최초 1회만)
   useEffect(() => {
@@ -138,13 +199,25 @@ export default function KakaoMap({
           });
         }
 
+        // 확대 레벨 변경 이벤트
+        window.kakao.maps.event.addListener(map, "zoom_changed", () => {
+          const level = map.getLevel();
+          setCurrentZoomLevel(level);
+        });
+
+        // 지도 클릭 이벤트 (빈 곳 클릭 시)
+        window.kakao.maps.event.addListener(map, "click", () => {
+          // 지도 빈 곳 클릭 시 이벤트 발생
+          window.dispatchEvent(new CustomEvent('mapClick'));
+        });
+
         // 지도 영역 변경 이벤트 (idle 이벤트 사용 - 지도 이동이 완료된 후에만 호출)
         if (onBoundsChangedRef.current) {
           window.kakao.maps.event.addListener(map, "idle", () => {
             const bounds = map.getBounds();
             const sw = bounds.getSouthWest();
             const ne = bounds.getNorthEast();
-            
+
             if (onBoundsChangedRef.current) {
               onBoundsChangedRef.current({
                 sw: { lat: sw.getLat(), lng: sw.getLng() },
@@ -183,10 +256,17 @@ export default function KakaoMap({
   useEffect(() => {
     if (!isMapLoaded || !mapRef.current || !window.kakao) return;
 
-    // 기존 마커 제거
+    // 확대 레벨에 따른 표시 로직 결정
+    const SHOW_INFOWINDOW_LEVEL = 4; // 레벨 4 이하에서는 인포윈도우 표시
+    const showInfoWindows = currentZoomLevel <= SHOW_INFOWINDOW_LEVEL;
+    const showMarkers = currentZoomLevel > SHOW_INFOWINDOW_LEVEL;
+
+    // 기존 마커/오버레이 제거
     const hadMarkers = markersRef.current.length > 0;
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current = [];
+    overlaysRef.current.forEach((ov) => ov.setMap(null));
+    overlaysRef.current = [];
 
     // 클러스터러 초기화
     if (clustererRef.current) {
@@ -206,30 +286,153 @@ export default function KakaoMap({
         title: markerData.title,
       });
 
+      // 마커 표시/숨김 제어
+      if (showMarkers) {
+        marker.setMap(mapRef.current);
+      }
+
       // 마커 클릭 이벤트
       window.kakao.maps.event.addListener(marker, "click", () => {
-        if (onMarkerClick) {
-          onMarkerClick(markerData.id);
-        } else if (markerData.onClick) {
-          markerData.onClick(markerData.id);
+        // 축소된 상태에서 마커 클릭 시 자동 확대
+        const ZOOM_IN_LEVEL = 4; // 확대할 목표 레벨
+        const ZOOM_THRESHOLD = 6; // 이 레벨 이상에서 확대 적용
+
+        if (currentZoomLevel >= ZOOM_THRESHOLD && mapRef.current) {
+          // 확대 애니메이션이 완료된 후 클릭 콜백 실행
+          const handleZoomComplete = () => {
+            // 확대 완료 이벤트 리스너 제거
+            window.kakao.maps.event.removeListener(mapRef.current, "idle", handleZoomComplete);
+
+            // 이제 클릭 콜백 실행 (모달 열기)
+            if (onMarkerClickRef.current) {
+              onMarkerClickRef.current(markerData.id);
+            } else if (markerData.onClick) {
+              markerData.onClick(markerData.id);
+            }
+          };
+
+          // 확대 완료 이벤트 리스너 추가
+          window.kakao.maps.event.addListener(mapRef.current, "idle", handleZoomComplete);
+
+          // 마커 위치로 지도 중심 이동 및 확대
+          mapRef.current.setLevel(ZOOM_IN_LEVEL);
+          mapRef.current.setCenter(markerPosition);
+        } else {
+          // 이미 확대된 상태라면 바로 클릭 콜백 실행
+          if (onMarkerClickRef.current) {
+            onMarkerClickRef.current(markerData.id);
+          } else if (markerData.onClick) {
+            markerData.onClick(markerData.id);
+          }
         }
       });
 
-      // 인포윈도우 (가격 표시)
-      if (markerData.price) {
-        const infowindow = new window.kakao.maps.InfoWindow({
-          content: `<div style="padding:5px;font-size:12px;font-weight:bold;">${markerData.price}</div>`,
-          removable: false,
+      // 커스텀 오버레이 (디자인된 말풍선) - 확대 레벨에 따라 표시
+      if (showInfoWindows && markerData.price) {
+        const content = `
+          <style>
+            @media (max-width: 768px) {
+              .info-window { width: 52px !important; }
+              .info-header { height: 24px !important; }
+              .info-body { height: 28px !important; }
+              .info-area { font-size: 11px !important; line-height: 22px !important; }
+              .info-price { font-size: 10px !important; line-height: 24px !important; }
+              .info-tail { border-left-width: 3px !important; border-right-width: 3px !important; border-top-width: 6px !important; bottom: -6px !important; }
+            }
+            @media (max-width: 480px) {
+              .info-window { width: 45px !important; }
+              .info-header { height: 22px !important; }
+              .info-body { height: 26px !important; }
+              .info-area { font-size: 10px !important; line-height: 20px !important; }
+              .info-price { font-size: 9px !important; line-height: 22px !important; }
+              .info-tail { border-left-width: 3px !important; border-right-width: 3px !important; border-top-width: 5px !important; bottom: -5px !important; }
+            }
+          </style>
+          <div class="info-window" style="
+            position: relative;
+            width: 65px;
+            height: auto;
+            background: #FFFFFF;
+            box-shadow: 0px 2px 10.4px rgba(0, 0, 0, 0.25);
+            border-radius: 8px;
+            overflow: hidden;
+            transform: translateY(-6px);
+            cursor: pointer;
+          " onclick="window.dispatchEvent(new CustomEvent('markerClick', {detail: '${markerData.id}'}))">
+            <!-- 상단 파란색 헤더 (평수) -->
+            <div class="info-header" style="
+              width: 100%;
+              height: 28px;
+              background: #198AE5;
+              border-radius: 8px 8px 0px 0px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            ">
+              <span class="info-area" style="
+                font-family: 'Pretendard', sans-serif;
+                font-style: normal;
+                font-weight: 400;
+                font-size: 12px;
+                line-height: 26px;
+                text-align: center;
+                color: #FFFFFF;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 100%;
+                padding: 0 3px;
+              ">${markerData.exclusive_area_pyeong ? Math.round(markerData.exclusive_area_pyeong) + '평' : '정보 없음'}</span>
+            </div>
+            <!-- 하단 흰색 본체 (가격) -->
+            <div class="info-body" style="
+              width: 100%;
+              height: 32px;
+              background: #FFFFFF;
+              border: 1px solid #BFBFBF;
+              border-top: none;
+              border-radius: 0px 0px 8px 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            ">
+              <span class="info-price" style="
+                font-family: 'Pretendard', sans-serif;
+                font-style: normal;
+                font-weight: 400;
+                font-size: 11px;
+                line-height: 28px;
+                text-align: center;
+                color: #353535;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 100%;
+                padding: 0 3px;
+              ">${markerData.price || markerData.title || "매물"}</span>
+            </div>
+            <!-- 아래쪽 뾰족한 꼬리 (마커처럼) -->
+            <div class="info-tail" style="
+              position: absolute;
+              bottom: -8px;
+              left: 50%;
+              transform: translateX(-50%);
+              width: 0;
+              height: 0;
+              border-left: 4px solid transparent;
+              border-right: 4px solid transparent;
+              border-top: 8px solid #FFFFFF;
+              filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.2));
+            "></div>
+          </div>`;
+        const overlay = new window.kakao.maps.CustomOverlay({
+          position: markerPosition,
+          content,
+          yAnchor: 1.0,
+          zIndex: 10,
         });
-
-        // 마커 hover 시 인포윈도우 표시
-        window.kakao.maps.event.addListener(marker, "mouseover", () => {
-          infowindow.open(mapRef.current, marker);
-        });
-
-        window.kakao.maps.event.addListener(marker, "mouseout", () => {
-          infowindow.close();
-        });
+        overlay.setMap(mapRef.current);
+        overlaysRef.current.push(overlay);
       }
 
       return marker;
@@ -254,7 +457,7 @@ export default function KakaoMap({
       });
       mapRef.current.setBounds(bounds);
     }
-  }, [isMapLoaded, markers, onMarkerClick]);
+  }, [isMapLoaded, markers, onMarkerClick, currentZoomLevel]);
 
   return (
     <div

@@ -84,7 +84,12 @@ class PreferencesView(APIView):
         preferred = request.data.get('preferred_regions')
         purpose = request.data.get('purpose')
         if isinstance(preferred, list):
-            profile.선호지역목록 = preferred
+            # 중복 제거 + 최대 3개 제한
+            uniq = []
+            for x in preferred:
+                if x not in uniq:
+                    uniq.append(x)
+            profile.선호지역목록 = uniq[:3]
         if purpose in ["귀어","귀농","취업","기타", None]:
             profile.귀촌목적 = purpose
         profile.save()

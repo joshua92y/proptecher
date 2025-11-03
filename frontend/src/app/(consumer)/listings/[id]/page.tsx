@@ -31,6 +31,8 @@ export default function ListingDetail({ params }: Params) {
   // 데이터
   const [data, setData] = useState<ListingDetailVM | null>(null);
   const [loading, setLoading] = useState(true);
+  const [floorplanUrl, setFloorplanUrl] = useState<string | null>(null);
+  const [floorplanLoading, setFloorplanLoading] = useState(false);
 
   // 임장 상태
   const [insStatus, setInsStatus] = useState<InspectionStatus | null>(null);
@@ -46,6 +48,25 @@ export default function ListingDetail({ params }: Params) {
       if (!alive) return;
       setData(vm);
       setLoading(false);
+    })();
+
+    // 평면도(임장 그린 이미지 우선, 없으면 업로드 URL)
+    (async () => {
+      try {
+        setFloorplanLoading(true);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const r = await fetch(`${apiUrl}/api/properties/${id}/floorplan/`, { cache: 'no-store' });
+        if (r.ok) {
+          const j: any = await r.json();
+          setFloorplanUrl(j?.image_url || null);
+        } else {
+          setFloorplanUrl(null);
+        }
+      } catch {
+        setFloorplanUrl(null);
+      } finally {
+        setFloorplanLoading(false);
+      }
     })();
 
     // 현재 임장 상태 (repo)
@@ -116,7 +137,7 @@ export default function ListingDetail({ params }: Params) {
         <Wrap>
           <EmptyBox>해당 매물 데이터를 찾을 수 없어요.</EmptyBox>
           <Section>
-            <ExploreCTA href="/listings">
+            <ExploreCTA href="/properties">
               <RowLeft>
                 <Emoji>🔙</Emoji>
                 <div><b>목록으로 돌아가기</b></div>
@@ -129,44 +150,131 @@ export default function ListingDetail({ params }: Params) {
     );
   }
 
-  const heroSrc = data.heroImages[0] ?? getListingImageByType(id, data.houseType);
+  // 이미지 소스 결정
+  const heroSrc = data.heroImages && data.heroImages.length > 0
+    ? data.heroImages[0]
+    : getListingImageByType(id, data.houseType);
 
   return (
     <MobileLayout title="매물 상세" showBack={true}>
     <Wrap>
-      {/* 히어로 영역 */}
-      <Hero>
+      {/* 히어로 영역 - 이미지와 오버레이 겹침 */}
+      <div style={{ position: 'relative', width: '100%', height: '288px', overflow: 'hidden', marginBottom: '20px' }}>
         <HeroImgWrap>
-          <Image src={heroSrc} alt="매물 사진" fill priority style={{ objectFit: "cover" }} />
+          <Image
+            src={heroSrc}
+            alt="매물 사진"
+            fill
+            priority
+            style={{ objectFit: "cover" }}
+            onError={(e) => {
+              console.error('Image failed to load:', heroSrc);
+              // 에러 시 기본 이미지로 변경
+              const target = e.target as HTMLImageElement;
+              target.src = '/images/apt1.jpg';
+            }}
+            onLoad={() => {
+              console.log('Image loaded successfully:', heroSrc);
+            }}
+          />
+          <Dots><Dot $active /><Dot /><Dot /></Dots>
         </HeroImgWrap>
 
-        <Dots><Dot $active /><Dot /><Dot /></Dots>
-
+        {/* 오버레이 정보 영역 - 이미지 위에 겹침 */}
         <HeroOverlay>
-          <PriceAccent>{`${data.leaseType} ${data.priceText}`}</PriceAccent>
-          <MetaRow><span>{data.address}</span></MetaRow>
+        <PriceAccent>{`${data.leaseType} ${data.priceText}`}</PriceAccent>
+        <MetaRow><span>{data.address}</span></MetaRow>
 
-          <MetaChips>
-            {data.adminFeeText && <Chip>월 관리비 {data.adminFeeText}</Chip>}
-            {data.parking && <Chip>{data.parking}</Chip>}
-          </MetaChips>
+        <MetaChips>
+          {data.adminFeeText && <Chip>월 관리비 {data.adminFeeText}</Chip>}
+          {data.parking && <Chip>{data.parking}</Chip>}
+        </MetaChips>
 
+        <InfoGrid>
+          <InfoBox>
+            <SmallLabel>전용면적</SmallLabel>
+            <BigValue>{data.specs.exclusiveAreaText}</BigValue>
+          </InfoBox>
+          <InfoBox>
+            <SmallLabel>방/욕실</SmallLabel>
+            <BigValue>{data.specs.roomsBathsText}</BigValue>
+          </InfoBox>
+          <InfoBox>
+            <SmallLabel>층수</SmallLabel>
+            <BigValue>{data.specs.floor}</BigValue>
+          </InfoBox>
+          <InfoBox>
+            <SmallLabel>준공년도</SmallLabel>
+            <BigValue>{data.specs.builtYearText}</BigValue>
+          </InfoBox>
+        </InfoGrid>
+
+        <RowLink onClick={() => setOpenInfo(true)}>
+          <span>매물 기본 정보</span>
+          <Arrow>›</Arrow>
+        </RowLink>
+      </HeroOverlay>
+      </div>
+
+      {/* 기본정보 모달 */}
+      <ListingInfoModal open={openInfo} onClose={() => setOpenInfo(false)} data={data} />
+
+      {/* 매물 기본 정보 섹션 */}
+      <Section>
+        <SectionTitle>매물 기본 정보</SectionTitle>
+        <SectionCard>
           <InfoGrid>
-            <InfoBox><SmallLabel>전용면적</SmallLabel><BigValue>{data.specs.exclusiveAreaText}</BigValue></InfoBox>
-            <InfoBox><SmallLabel>방/욕실</SmallLabel><BigValue>{data.specs.roomsBathsText}</BigValue></InfoBox>
-            <InfoBox><SmallLabel>층수</SmallLabel><BigValue>{data.specs.floor}</BigValue></InfoBox>
-            <InfoBox><SmallLabel>준공년도</SmallLabel><BigValue>{data.specs.builtYearText}</BigValue></InfoBox>
+            <InfoBox>
+              <SmallLabel>전용면적</SmallLabel>
+              <BigValue>{data.specs.exclusiveAreaText}</BigValue>
+            </InfoBox>
+            <InfoBox>
+              <SmallLabel>방/욕실</SmallLabel>
+              <BigValue>{data.specs.roomsBathsText}</BigValue>
+            </InfoBox>
+            <InfoBox>
+              <SmallLabel>층수</SmallLabel>
+              <BigValue>{data.specs.floor}</BigValue>
+            </InfoBox>
+            <InfoBox>
+              <SmallLabel>준공년도</SmallLabel>
+              <BigValue>{data.specs.builtYearText}</BigValue>
+            </InfoBox>
           </InfoGrid>
+          <PrimaryButton style={{ marginTop: 12 }} onClick={() => setOpenInfo(true)}>상세 정보 확인하기</PrimaryButton>
+        </SectionCard>
+      </Section>
 
-          <RowLink onClick={() => setOpenInfo(true)}>
-            <span>매물 기본 정보</span>
-            <Arrow>›</Arrow>
-          </RowLink>
-        </HeroOverlay>
+      {/* 평면도 */}
+      <Section>
+        <SectionTitle>평면도</SectionTitle>
+        <SectionDesc>방문을 클릭하면 상세 사진을 볼 수 있습니다</SectionDesc>
+        <FloorplanBox>
+          {floorplanLoading ? (
+            <EmptyBox>평면도를 불러오는 중…</EmptyBox>
+          ) : floorplanUrl ? (
+            <div style={{ position:'relative', width:'100%', height:'100%' }}>
+              <Image src={floorplanUrl} alt="평면도" fill style={{ objectFit:'contain' }} />
+            </div>
+          ) : (
+            <EmptyBox>평면도가 없습니다.</EmptyBox>
+          )}
+        </FloorplanBox>
+      </Section>
 
-        {/* 기본정보 모달 */}
-        <ListingInfoModal open={openInfo} onClose={() => setOpenInfo(false)} data={data} />
-      </Hero>
+      {/* 상세 정보 확인 (AI 총평 등) */}
+      <Section>
+        <SectionTitle>상세 정보 확인</SectionTitle>
+        <AICard>
+          <AIBadge>✨ AI 총평</AIBadge>
+          <SmallP>
+            {(data.life.summary && data.life.summary !== '내용이 아직 없어요.')
+              ? data.life.summary
+              : (data.env.amenity.summary || '상세 정보는 준비 중입니다.')}
+          </SmallP>
+          <PrimaryButton style={{ marginTop: 12 }}>상세 정보 확인하기</PrimaryButton>
+        </AICard>
+      </Section>
 
       {/* 임장 리포트 요청 섹션 (상태에 따라 분기) */}
       <Section>
@@ -229,10 +337,11 @@ export default function ListingDetail({ params }: Params) {
                   </ScoreBox>
                 </ScoreRow>
 
+                <CategoryTitle>가까운 버스정류장</CategoryTitle>
                 <List>
-                  {data.env.traffic.busStops.map((b, i) => (
+                  {(data.env.traffic.busStops ?? []).map((b, i) => (
                     <ListItem key={`bus-${i}`}>
-                      <LeftDot />
+                      <LeftIcon>🚌</LeftIcon>
                       <ItemText>
                         <ItemTitle>{b.name}</ItemTitle>
                         {b.distance && <ItemMeta>{b.distance}</ItemMeta>}
@@ -240,9 +349,13 @@ export default function ListingDetail({ params }: Params) {
                       </ItemText>
                     </ListItem>
                   ))}
-                  {data.env.traffic.subways.map((s, i) => (
+                </List>
+
+                <CategoryTitle>가까운 지하철역</CategoryTitle>
+                <List>
+                  {(data.env.traffic.subways ?? []).map((s, i) => (
                     <ListItem key={`sub-${i}`}>
-                      <LeftDot />
+                      <LeftIcon>🚇</LeftIcon>
                       <ItemText>
                         <ItemTitle>{s.name}</ItemTitle>
                         {s.distance && <ItemMeta>{s.distance}</ItemMeta>}
@@ -297,7 +410,7 @@ export default function ListingDetail({ params }: Params) {
 
       {/* 주변환경 CTA */}
       <Section>
-        <ExploreCTA href={`/listings/${id}/explore`}>
+        <ExploreCTA href={`/properties/${id}/explore`}>
           <RowLeft>
             <Emoji>👥</Emoji>
             <div><b>주변 환경이 궁금하다면?</b><SmallP>주변 환경 보러가기</SmallP></div>
@@ -332,69 +445,253 @@ const SkeletonHero = styled.div`height:200px;background:#f3f3f3;`;
 const SkeletonBox = styled.div`height:120px;background:#f8f8f8;border-radius:12px;`;
 
 /* 히어로 */
-const Hero = styled.div`position:relative;`;
-const HeroImgWrap = styled.div`position:relative;width:100%;height:200px;overflow:hidden;`;
-const Dots = styled.div`position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:6px;`;
-const Dot = styled.span<{ $active?: boolean }>`
-  width:6px;height:6px;border-radius:50%;background:${p=>p.$active?"#7b3fe4":"#ddd"};
+const HeroImgWrap = styled.div`
+  position:relative;
+  width:100%;
+  height:288px;
+  overflow:hidden;
 `;
-const HeroOverlay = styled.div`padding:12px;background:#fff;border-top-left-radius:12px;border-top-right-radius:12px;margin-top:-8px;`;
-const PriceAccent = styled.div`color:#7b3fe4;font-weight:800;font-size:18px;`;
-const MetaRow = styled.div`color:#666;margin-top:4px;`;
-const MetaChips = styled.div`display:flex;gap:6px;margin-top:6px;`;
-const Chip = styled.span`font-size:12px;background:#f3f1ff;color:#7b3fe4;border-radius:999px;padding:3px 8px;`;
 
-const InfoGrid = styled.div`display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px;`;
-const InfoBox = styled.div`background:#fafafa;border:1px solid #eee;border-radius:12px;padding:10px;`;
-const SmallLabel = styled.div`font-size:12px;color:#666;`;
-const BigValue = styled.div`font-size:14px;font-weight:700;`;
-const RowLink = styled.button`display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:10px;background:none;border:none;padding:10px 0;`;
+const Dots = styled.div`
+  position:absolute;
+  left:50%;
+  bottom:20px;
+  transform:translateX(-50%);
+  display:flex;
+  gap:6px;
+  z-index:10;
+`;
+
+const Dot = styled.span<{ $active?: boolean }>`
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:${p=>p.$active?"#844df3":"#ddd"};
+`;
+
+const HeroOverlay = styled.div`
+  position:absolute;
+  top:150px;
+  left:0;
+  right:0;
+  background:#ffffff;
+  border-top-left-radius:12px;
+  border-top-right-radius:12px;
+  padding:20px;
+  min-height:200px;
+  box-shadow: 0px -4px 20px rgba(0, 0, 0, 0.1);
+  z-index:20;
+`;
+const PriceAccent = styled.div`
+  color:#844df3;
+  font-family: "Pretendard-ExtraBold", Helvetica;
+  font-size:26px;
+  font-weight:800;
+  letter-spacing:-0.78px;
+  line-height:21px;
+  margin-bottom:8px;
+`;
+const MetaRow = styled.div`
+  color:#6a6969;
+  font-family: "Pretendard-Medium", Helvetica;
+  font-size:16px;
+  font-weight:500;
+  letter-spacing:0;
+  line-height:34px;
+  margin-bottom:12px;
+`;
+const MetaChips = styled.div`display:flex;gap:6px;margin-top:6px;`;
+const Chip = styled.span`
+  font-size:12px;
+  background:#f3f1ff;
+  color:#844df3;
+  border-radius:999px;
+  padding:3px 8px;
+  font-family: "Pretendard-Medium", Helvetica;
+  font-weight:500;
+`;
+
+const InfoGrid = styled.div`
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:8px;
+  margin-top:16px;
+`;
+const InfoBox = styled.div`
+  background:#fafafa;
+  border:1px solid #eee;
+  border-radius:12px;
+  padding:10px;
+  min-height:60px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+`;
+const SmallLabel = styled.div`
+  color:#666;
+  font-family: "Pretendard-Medium", Helvetica;
+  font-size:14px;
+  font-weight:500;
+  margin-bottom:4px;
+`;
+const BigValue = styled.div`
+  color:#000000;
+  font-family: "Pretendard-Bold", Helvetica;
+  font-size:16px;
+  font-weight:700;
+  line-height:21px;
+`;
+const RowLink = styled.button`
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  width:100%;
+  margin-top:20px;
+  background:none;
+  border:none;
+  padding:10px 0;
+  font-family: "Pretendard-Bold", Helvetica;
+  font-size:22px;
+  font-weight:700;
+  color:#000000;
+`;
 const Arrow = styled.span``;
 
 /* 섹션 공통 */
 const Section = styled.section`padding:12px;`;
 const SectionCard = styled.div`background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;`;
-const SectionTitle = styled.h3`margin:0 0 6px;font-size:15px;`;
-const SectionDesc = styled.p`margin:0 0 12px;color:#666;`;
+const SectionTitle = styled.h3`
+  margin:0 0 6px;
+  font-size:15px;
+  font-family: "Pretendard-Bold", Helvetica;
+  font-weight:700;
+  color:#000000;
+`;
+const SectionDesc = styled.p`
+  margin:0 0 12px;
+  color:#666;
+  font-family: "Pretendard-Medium", Helvetica;
+  font-weight:500;
+`;
+const FloorplanBox = styled.div`height:200px;background:#f8f8f8;border:1px solid #eee;border-radius:12px;`;
+const AICard = styled.div`background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;`;
+const AIBadge = styled.span`display:inline-block;background:#f4efff;color:#844df3;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:700;`;
 const PrimaryButton = styled.button`
-  width:100%;height:44px;border:none;border-radius:12px;background:#7b3fe4;color:#fff;font-weight:700;
+  width:100%;height:44px;border:none;border-radius:12px;background:#844df3;color:#fff;font-weight:700;
+  font-family: "Pretendard-Bold", Helvetica;
+  font-size:16px;
 `;
 
 /* 탭 */
 const MainTabs = styled.div`display:flex;gap:6px;margin-bottom:8px;`;
 const MainTab = styled.button<{ $active?: boolean }>`
-  flex:1;height:36px;border-radius:10px;border:1px solid ${p=>p.$active?"#7b3fe4":"#eee"};
+  flex:1;height:36px;border-radius:10px;border:1px solid ${p=>p.$active?"#844df3":"#eee"};
   background:${p=>p.$active?"#f4efff":"#fff"};
+  font-family: "Pretendard-Medium", Helvetica;
+  font-weight:500;
 `;
 const SubTabs = styled.div`display:flex;gap:6px;margin:6px 0;`;
 const SubTab = styled.button<{ $active?: boolean }>`
-  height:28px;padding:0 10px;border-radius:999px;border:1px solid ${p=>p.$active?"#7b3fe4":"#eee"};
+  height:28px;padding:0 10px;border-radius:999px;border:1px solid ${p=>p.$active?"#844df3":"#eee"};
   background:${p=>p.$active?"#f4efff":"#fff"};font-size:12px;
+  font-family: "Pretendard-Medium", Helvetica;
+  font-weight:500;
 `;
 
 /* 리스트/점수 */
 const ScoreRow = styled.div`display:flex;gap:8px;margin:8px 0;`;
 const ScoreBox = styled.div`flex:1;background:#fafafa;border:1px solid #eee;border-radius:12px;padding:10px;`;
 const ScoreTitle = styled.div`font-size:12px;color:#666;`;
-const ScoreValue = styled.div`font-size:14px;`;
+const ScoreValue = styled.div`
+  font-size:14px;
+  font-family: "Pretendard-Bold", Helvetica;
+  font-weight:700;
+  color:#000000;
+`;
 
 const List = styled.ul`list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;`;
 const ListItem = styled.li`display:flex;gap:10px;align-items:flex-start;`;
 const LeftDot = styled.div`width:6px;height:6px;background:#bbb;border-radius:50%;margin-top:7px;`;
 const ItemText = styled.div``;
-const ItemTitle = styled.div`font-weight:700;`;
-const ItemMeta = styled.div`color:#888;font-size:12px;`;
+const ItemTitle = styled.div`
+  font-weight:700;
+  font-family: "Pretendard-Bold", Helvetica;
+  color:#000000;
+`;
+const ItemMeta = styled.div`
+  color:#888;
+  font-size:12px;
+  font-family: "Pretendard-Medium", Helvetica;
+  font-weight:500;
+`;
 const PillRow = styled.div`display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;`;
-const Pill = styled.span`font-size:11px;background:#f5f5f5;border:1px solid #eee;border-radius:999px;padding:2px 6px;`;
+const Pill = styled.span`
+  font-size:11px;
+  background:#f5f5f5;
+  border:1px solid #eee;
+  border-radius:999px;
+  padding:2px 6px;
+  font-family: "Pretendard-Medium", Helvetica;
+  font-weight:500;
+`;
 
-const InfoCard = styled.div`padding:10px;border:1px solid #eee;border-radius:12px;background:#fff;`;
-const SmallP = styled.p`margin:6px 0 0;color:#666;`;
+const CategoryTitle = styled.h4`
+  margin:12px 0 6px;
+  font-size:14px;
+  color:#444;
+  font-family: "Pretendard-Bold", Helvetica;
+  font-weight:700;
+`;
+
+const LeftIcon = styled.div`
+  width:18px;
+  height:18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-top:3px;
+`;
+
+const InfoCard = styled.div`
+  padding:10px;
+  border:1px solid #eee;
+  border-radius:12px;
+  background:#fff;
+  font-family: "Pretendard-Bold", Helvetica;
+  font-weight:700;
+`;
+const SmallP = styled.p`
+  margin:6px 0 0;
+  color:#666;
+  font-family: "Pretendard-Medium", Helvetica;
+  font-weight:500;
+`;
 
 /* Q&A */
 const QAHeader = styled.div`display:flex;justify-content:space-between;align-items:center;`;
-const QAHeading = styled.h3`margin:0;`;
-const GhostButton = styled.button`border:1px solid #ddd;border-radius:10px;background:#fff;height:32px;padding:0 10px;`;
-const EmptyBox = styled.div`padding:30px;text-align:center;color:#888;`;
+const QAHeading = styled.h3`
+  margin:0;
+  font-family: "Pretendard-Bold", Helvetica;
+  font-weight:700;
+  font-size:22px;
+  color:#000000;
+`;
+const GhostButton = styled.button`
+  border:1px solid #ddd;
+  border-radius:10px;
+  background:#fff;
+  height:32px;
+  padding:0 10px;
+  font-family: "Pretendard-Medium", Helvetica;
+  font-weight:500;
+`;
+const EmptyBox = styled.div`
+  padding:30px;
+  text-align:center;
+  color:#888;
+  font-family: "Pretendard-Medium", Helvetica;
+  font-weight:500;
+`;
 
 /* CTA */
 const ExploreCTA = styled(Link)`
@@ -410,5 +707,7 @@ const BottomBar = styled.div`
 `;
 const RoundBtn = styled.button`width:44px;height:44px;border-radius:999px;border:1px solid #eee;background:#fff;`;
 const BottomPrimary = styled.button`
-  flex:1;height:44px;border:none;border-radius:12px;background:#7b3fe4;color:#fff;font-weight:700;
+  flex:1;height:44px;border:none;border-radius:12px;background:#844df3;color:#fff;font-weight:700;
+  font-family: "Pretendard-Bold", Helvetica;
+  font-size:16px;
 `;

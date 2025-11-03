@@ -1,7 +1,7 @@
 // components/consumer/modals/RequestInspectionModal.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import styled from "styled-components";
 
 type Props = {
@@ -15,11 +15,27 @@ export default function RequestInspectionModal({ open, onClose, onSubmit }: Prop
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
 
-  if (!open) return null;
+  // mount/animation state
+  const [visible, setVisible] = useState(open);
+  const [state, setState] = useState<"in" | "out">("out");
+
+  useEffect(() => {
+    if (open) {
+      setVisible(true);
+      // next frame to allow transition
+      requestAnimationFrame(() => setState("in"));
+    } else if (visible) {
+      setState("out");
+      const t = setTimeout(() => setVisible(false), 250);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
+  if (!visible) return null;
 
   return (
-    <Dim>
-      <Sheet>
+    <Dim onClick={onClose} data-state={state}>
+      <Sheet onClick={(e) => e.stopPropagation()} data-state={state}>
         <Title>임장 요청</Title>
 
         <Field>
@@ -54,12 +70,23 @@ export default function RequestInspectionModal({ open, onClose, onSubmit }: Prop
   );
 }
 
+// 하단 네비게이션 바 높이를 CSS 변수로 조절 가능
 const Dim = styled.div`
-  position: fixed; inset: 0; background: rgba(0,0,0,0.35);
-  display:flex; align-items:flex-end; z-index: 1000;
+  position: fixed; left:0; right:0; top:0; 
+  bottom: calc(var(--bottom-nav-height, 64px) + env(safe-area-inset-bottom, 0));
+  background: rgba(0,0,0,0.35);
+  display:flex; align-items:flex-end; z-index: 4000;
+  opacity: 0; transition: opacity 200ms ease;
+  &[data-state="in"] { opacity: 1; }
+  &[data-state="out"] { opacity: 0; }
 `;
 const Sheet = styled.div`
   width:100%; background:#fff; border-radius:16px 16px 0 0; padding:16px; box-shadow: 0 -8px 24px rgba(0,0,0,0.1);
+  padding-bottom: 16px;
+  transform: translateY(100%); opacity: 0;
+  transition: transform 220ms ease, opacity 220ms ease;
+  &[data-state="in"] { transform: translateY(0); opacity: 1; }
+  &[data-state="out"] { transform: translateY(100%); opacity: 0; }
 `;
 const Title = styled.h3`margin:0 0 12px; font-size:16px;`;
 const Field = styled.div`& + & { margin-top:10px; }`;

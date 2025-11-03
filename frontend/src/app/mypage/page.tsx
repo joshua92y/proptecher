@@ -2,17 +2,48 @@
 
 import styled from "styled-components";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import MobileLayout from "@/components/MobileLayout";
 
 export default function MyPage() {
   const router = useRouter();
+  const [userName, setUserName] = useState<string>("게스트");
+  const [userEmail, setUserEmail] = useState<string>("guest@example.com");
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("authToken");
+      const name = localStorage.getItem("userName");
+      const email = localStorage.getItem("userEmail");
+
+      if (token && name && email) {
+        setUserName(name);
+        setUserEmail(email);
+        setIsLoggedIn(true);
+      }
+    }
+  }, []);
+
+  const handleLogout = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("userName");
+      localStorage.removeItem("userEmail");
+      localStorage.removeItem("userType");
+    }
+    setUserName("게스트");
+    setUserEmail("guest@example.com");
+    setIsLoggedIn(false);
+    router.replace("/");
+  };
 
   const menuItems = [
     { id: "inspections", label: "내 임장보고서", icon: "📋", path: "/mypage/inspections" },
-    { id: "profile", label: "프로필 수정", icon: "✏️", path: "" },
+    { id: "preferences", label: "관심지역/귀촌목적", icon: "📍", path: "/mypage/preferences" },
     { id: "favorites", label: "관심 매물", icon: "❤️", path: "" },
     { id: "history", label: "최근 본 매물", icon: "👁️", path: "" },
-    { id: "inquiries", label: "문의 내역", icon: "💬", path: "" },
+    { id: "profile", label: "프로필 수정", icon: "✏️", path: "" },
     { id: "settings", label: "설정", icon: "⚙️", path: "" },
   ];
 
@@ -21,12 +52,17 @@ export default function MyPage() {
       <Container>
         <ProfileSection>
           <ProfileImage>👤</ProfileImage>
-          <ProfileName>게스트</ProfileName>
-          <ProfileEmail>guest@example.com</ProfileEmail>
-          <LoginButton>로그인 / 회원가입</LoginButton>
+          <ProfileName>{userName}</ProfileName>
+          <ProfileEmail>{userEmail}</ProfileEmail>
+          {!isLoggedIn ? (
+            <LoginButton onClick={() => router.push("/login")}>로그인 / 회원가입</LoginButton>
+          ) : (
+            <ProfileStatus>로그인됨</ProfileStatus>
+          )}
         </ProfileSection>
 
         <MenuSection>
+          <MenuHeader>내 정보 설정</MenuHeader>
           {menuItems.map((item) => (
             <MenuItem
               key={item.id}
@@ -43,10 +79,12 @@ export default function MyPage() {
           ))}
         </MenuSection>
 
-        <Footer>
-          <FooterButton>로그아웃</FooterButton>
-          <FooterButton>회원탈퇴</FooterButton>
-        </Footer>
+        {isLoggedIn && (
+          <Footer>
+            <FooterButton onClick={handleLogout}>로그아웃</FooterButton>
+            <FooterButton>회원탈퇴</FooterButton>
+          </Footer>
+        )}
       </Container>
     </MobileLayout>
   );
@@ -92,9 +130,9 @@ const ProfileEmail = styled.p`
 const LoginButton = styled.button`
   padding: 12px 32px;
   border-radius: 8px;
-  border: 1px solid #6e39ff;
+  border: 1px solid #844df3;
   background: #fff;
-  color: #6e39ff;
+  color: #844df3;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -104,9 +142,24 @@ const LoginButton = styled.button`
   }
 `;
 
+const ProfileStatus = styled.div`
+  padding: 12px 32px;
+  border-radius: 8px;
+  background: #f3f1ff;
+  color: #844df3;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+`;
+
 const MenuSection = styled.div`
   background: #fff;
   margin-bottom: 8px;
+`;
+
+const MenuHeader = styled.h3`
+  margin: 0; padding: 14px 20px; font-size: 14px; color: #6a6969; font-weight: 700;
+  border-bottom: 1px solid #f5f5f5;
 `;
 
 const MenuItem = styled.button`
