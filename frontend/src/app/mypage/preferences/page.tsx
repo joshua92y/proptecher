@@ -4,17 +4,20 @@ import React, { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import MobileLayout from "@/components/MobileLayout";
 import { apiFetch } from "@/lib/utils/api";
+import { useRouter } from "next/navigation";
 
 const PRIMARY = "#2F80ED";
 const REGION_LIST = ["서울", "경기", "인천", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "부산", "대구", "광주", "대전", "울산", "제주"];
 const PURPOSE_LIST = ["귀어","귀농","취업","기타"] as const;
 
 export default function PreferencesPage() {
+  const router = useRouter();
   const [email, setEmail] = useState<string>("");
   const [regions, setRegions] = useState<string[]>([]);
   const [purpose, setPurpose] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savedToast, setSavedToast] = useState(false);
 
   useEffect(() => {
     const e = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
@@ -39,18 +42,25 @@ export default function PreferencesPage() {
   }, [email]);
 
   const toggleRegion = (name: string) => {
-    setRegions((prev) => prev.includes(name) ? prev.filter(r => r !== name) : [...prev, name]);
+    setRegions((prev) => prev.includes(name) ? prev.filter(r => r !== name) : (prev.length < 3 ? [...prev, name] : prev));
   };
 
   const onSave = async () => {
     if (!email) return;
     setSaving(true);
     try {
-      await apiFetch(`/api/users/preferences`, {
+      const res = await apiFetch(`/api/users/preferences`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, preferred_regions: regions, purpose })
       });
+      if (res.ok) {
+        setSavedToast(true);
+        setTimeout(() => {
+          setSavedToast(false);
+          router.replace('/mypage');
+        }, 1200);
+      }
     } finally {
       setSaving(false);
     }
@@ -81,9 +91,13 @@ export default function PreferencesPage() {
             <Section>
               <Title>관심 지역</Title>
               <Chips>
-                {REGION_LIST.map((n) => (
-                  <Chip key={n} $active={regions.includes(n)} onClick={() => toggleRegion(n)}>{n}</Chip>
-                ))}
+                {REGION_LIST.map((n) => {
+                  const isActive = regions.includes(n);
+                  const canAdd = isActive || regions.length < 3;
+                  return (
+                    <Chip key={n} $active={isActive} disabled={!canAdd} onClick={() => toggleRegion(n)}>{n}</Chip>
+                  );
+                })}
               </Chips>
             </Section>
 
@@ -103,6 +117,9 @@ export default function PreferencesPage() {
                 <GhostButton onClick={onReset} disabled={saving}>초기화</GhostButton>
               </FooterInner>
             </FixedFooter>
+            {savedToast && (
+              <Toast role="status">저장되었습니다</Toast>
+            )}
           </>
         )}
       </Container>
@@ -125,6 +142,7 @@ const Chips = styled.div`
 const Chip = styled.button<{ $active?: boolean }>`
   border: 1.5px solid ${(p)=>p.$active?PRIMARY:'#e5e7eb'}; background: ${(p)=>p.$active?'#F5FAFF':'#fff'};
   color: #111; border-radius: 16px; padding: 8px 12px; font-weight: 700; font-size: 13px;
+  &:disabled { opacity: .5; cursor: not-allowed; }
 `;
 const Empty = styled.p`
   text-align: center; color: #9ca3af; margin-top: 40px;
@@ -140,6 +158,20 @@ const PrimaryButton = styled.button<{disabled?: boolean}>`
 `;
 const GhostButton = styled.button`
   width: 100%; height: 54px; border-radius: 14px; border: 1px solid #e5e7eb; background: #fff; color: #374151; font-weight: 700; font-size: 16px;
+`;
+
+const Toast = styled.div`
+  position: fixed;
+  left: 50%;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.85);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  z-index: 5000;
 `;
 
 

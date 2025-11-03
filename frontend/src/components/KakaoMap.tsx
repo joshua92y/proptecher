@@ -97,12 +97,42 @@ export default function KakaoMap({
       window.dispatchEvent(new CustomEvent('mapEmptyClick'));
     };
 
+    const handleFocusRegion = (ev: any) => {
+      if (!mapRef.current || !window.kakao?.maps?.services) return;
+      const regionName = ev.detail as string;
+      const geocoder = new window.kakao.maps.services.Geocoder();
+      geocoder.addressSearch(regionName, (result: any, status: any) => {
+        if (status === window.kakao.maps.services.Status.OK && result && result[0]) {
+          const { x, y } = result[0];
+          const latLng = new window.kakao.maps.LatLng(parseFloat(y), parseFloat(x));
+          // 간단한 확대 레벨 추정: 광역권은 9, 시/구는 7, 동/면은 5
+          const lvl = /도$|특별시$|광역시$|자치시$|^서울|^경기|^인천|^부산|^대구|^광주|^대전|^울산|^세종/.test(regionName) ? 9
+            : /시$|구$|군$/.test(regionName) ? 7 : 5;
+          mapRef.current.setLevel(lvl);
+          mapRef.current.setCenter(latLng);
+        }
+      });
+    };
+
+    const handleFitBounds = (ev: any) => {
+      if (!mapRef.current || !window.kakao) return;
+      const points = (ev.detail || []) as Array<{ lat: number; lng: number }>;
+      if (!points || points.length === 0) return;
+      const bounds = new window.kakao.maps.LatLngBounds();
+      points.forEach((p) => bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng)));
+      mapRef.current.setBounds(bounds);
+    };
+
     window.addEventListener('markerClick', handleMarkerClick);
     window.addEventListener('mapClick', handleMapClick);
+    window.addEventListener('focusRegion', handleFocusRegion as EventListener);
+    window.addEventListener('fitBounds', handleFitBounds as EventListener);
 
     return () => {
       window.removeEventListener('markerClick', handleMarkerClick);
       window.removeEventListener('mapClick', handleMapClick);
+      window.removeEventListener('focusRegion', handleFocusRegion as EventListener);
+      window.removeEventListener('fitBounds', handleFitBounds as EventListener);
     };
   }, []); // 의존성 제거하여 매번 리렌더링 방지
 

@@ -31,6 +31,8 @@ export default function ListingDetail({ params }: Params) {
   // 데이터
   const [data, setData] = useState<ListingDetailVM | null>(null);
   const [loading, setLoading] = useState(true);
+  const [floorplanUrl, setFloorplanUrl] = useState<string | null>(null);
+  const [floorplanLoading, setFloorplanLoading] = useState(false);
 
   // 임장 상태
   const [insStatus, setInsStatus] = useState<InspectionStatus | null>(null);
@@ -46,6 +48,25 @@ export default function ListingDetail({ params }: Params) {
       if (!alive) return;
       setData(vm);
       setLoading(false);
+    })();
+
+    // 평면도(임장 그린 이미지 우선, 없으면 업로드 URL)
+    (async () => {
+      try {
+        setFloorplanLoading(true);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const r = await fetch(`${apiUrl}/api/properties/${id}/floorplan/`, { cache: 'no-store' });
+        if (r.ok) {
+          const j: any = await r.json();
+          setFloorplanUrl(j?.image_url || null);
+        } else {
+          setFloorplanUrl(null);
+        }
+      } catch {
+        setFloorplanUrl(null);
+      } finally {
+        setFloorplanLoading(false);
+      }
     })();
 
     // 현재 임장 상태 (repo)
@@ -198,6 +219,63 @@ export default function ListingDetail({ params }: Params) {
       {/* 기본정보 모달 */}
       <ListingInfoModal open={openInfo} onClose={() => setOpenInfo(false)} data={data} />
 
+      {/* 매물 기본 정보 섹션 */}
+      <Section>
+        <SectionTitle>매물 기본 정보</SectionTitle>
+        <SectionCard>
+          <InfoGrid>
+            <InfoBox>
+              <SmallLabel>전용면적</SmallLabel>
+              <BigValue>{data.specs.exclusiveAreaText}</BigValue>
+            </InfoBox>
+            <InfoBox>
+              <SmallLabel>방/욕실</SmallLabel>
+              <BigValue>{data.specs.roomsBathsText}</BigValue>
+            </InfoBox>
+            <InfoBox>
+              <SmallLabel>층수</SmallLabel>
+              <BigValue>{data.specs.floor}</BigValue>
+            </InfoBox>
+            <InfoBox>
+              <SmallLabel>준공년도</SmallLabel>
+              <BigValue>{data.specs.builtYearText}</BigValue>
+            </InfoBox>
+          </InfoGrid>
+          <PrimaryButton style={{ marginTop: 12 }} onClick={() => setOpenInfo(true)}>상세 정보 확인하기</PrimaryButton>
+        </SectionCard>
+      </Section>
+
+      {/* 평면도 */}
+      <Section>
+        <SectionTitle>평면도</SectionTitle>
+        <SectionDesc>방문을 클릭하면 상세 사진을 볼 수 있습니다</SectionDesc>
+        <FloorplanBox>
+          {floorplanLoading ? (
+            <EmptyBox>평면도를 불러오는 중…</EmptyBox>
+          ) : floorplanUrl ? (
+            <div style={{ position:'relative', width:'100%', height:'100%' }}>
+              <Image src={floorplanUrl} alt="평면도" fill style={{ objectFit:'contain' }} />
+            </div>
+          ) : (
+            <EmptyBox>평면도가 없습니다.</EmptyBox>
+          )}
+        </FloorplanBox>
+      </Section>
+
+      {/* 상세 정보 확인 (AI 총평 등) */}
+      <Section>
+        <SectionTitle>상세 정보 확인</SectionTitle>
+        <AICard>
+          <AIBadge>✨ AI 총평</AIBadge>
+          <SmallP>
+            {(data.life.summary && data.life.summary !== '내용이 아직 없어요.')
+              ? data.life.summary
+              : (data.env.amenity.summary || '상세 정보는 준비 중입니다.')}
+          </SmallP>
+          <PrimaryButton style={{ marginTop: 12 }}>상세 정보 확인하기</PrimaryButton>
+        </AICard>
+      </Section>
+
       {/* 임장 리포트 요청 섹션 (상태에 따라 분기) */}
       <Section>
         {insStatus === null && (
@@ -259,10 +337,11 @@ export default function ListingDetail({ params }: Params) {
                   </ScoreBox>
                 </ScoreRow>
 
+                <CategoryTitle>가까운 버스정류장</CategoryTitle>
                 <List>
-                  {data.env.traffic.busStops.map((b, i) => (
+                  {(data.env.traffic.busStops ?? []).map((b, i) => (
                     <ListItem key={`bus-${i}`}>
-                      <LeftDot />
+                      <LeftIcon>🚌</LeftIcon>
                       <ItemText>
                         <ItemTitle>{b.name}</ItemTitle>
                         {b.distance && <ItemMeta>{b.distance}</ItemMeta>}
@@ -270,9 +349,13 @@ export default function ListingDetail({ params }: Params) {
                       </ItemText>
                     </ListItem>
                   ))}
-                  {data.env.traffic.subways.map((s, i) => (
+                </List>
+
+                <CategoryTitle>가까운 지하철역</CategoryTitle>
+                <List>
+                  {(data.env.traffic.subways ?? []).map((s, i) => (
                     <ListItem key={`sub-${i}`}>
-                      <LeftDot />
+                      <LeftIcon>🚇</LeftIcon>
                       <ItemText>
                         <ItemTitle>{s.name}</ItemTitle>
                         {s.distance && <ItemMeta>{s.distance}</ItemMeta>}
@@ -490,6 +573,9 @@ const SectionDesc = styled.p`
   font-family: "Pretendard-Medium", Helvetica;
   font-weight:500;
 `;
+const FloorplanBox = styled.div`height:200px;background:#f8f8f8;border:1px solid #eee;border-radius:12px;`;
+const AICard = styled.div`background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;`;
+const AIBadge = styled.span`display:inline-block;background:#f4efff;color:#844df3;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:700;`;
 const PrimaryButton = styled.button`
   width:100%;height:44px;border:none;border-radius:12px;background:#844df3;color:#fff;font-weight:700;
   font-family: "Pretendard-Bold", Helvetica;
@@ -547,6 +633,23 @@ const Pill = styled.span`
   padding:2px 6px;
   font-family: "Pretendard-Medium", Helvetica;
   font-weight:500;
+`;
+
+const CategoryTitle = styled.h4`
+  margin:12px 0 6px;
+  font-size:14px;
+  color:#444;
+  font-family: "Pretendard-Bold", Helvetica;
+  font-weight:700;
+`;
+
+const LeftIcon = styled.div`
+  width:18px;
+  height:18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-top:3px;
 `;
 
 const InfoCard = styled.div`

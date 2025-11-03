@@ -1,27 +1,68 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import styled, { keyframes } from "styled-components";
+import styled, { keyframes, css } from "styled-components";
 import MobileLayout from "@/components/MobileLayout";
+import { getListings, type ListingListItem } from "@/lib/data/listings";
 
 export default function Home() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+  const [favRegions, setFavRegions] = useState<string[]>([]);
+  const [listings, setListings] = useState<ListingListItem[]>([]);
+  const [cur, setCur] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const progressMock = 57; // 임시 목업 진행률 (%)
 
   useEffect(() => {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
       const name = typeof window !== 'undefined' ? localStorage.getItem('userName') : null;
+      const em = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
       // 로그인 여부는 토큰 기준으로만 판단
       setIsLoggedIn(!!token);
       setUserName(name);
+      setEmail(em);
     } catch (_) {
       setIsLoggedIn(false);
       setUserName(null);
+      setEmail(null);
     }
   }, []);
+
+  // 관심지역 + 매물 불러오기
+  useEffect(() => {
+    if (!isLoggedIn || !email) return;
+    (async () => {
+      try {
+        // 1) 관심지역
+        const API_BASE = process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+        const res = await fetch(`${API_BASE}/api/users/preferences?email=${encodeURIComponent(email)}`);
+        const pref = await res.json();
+        const regs: string[] = Array.isArray(pref.preferred_regions) ? pref.preferred_regions : [];
+        setFavRegions(regs);
+
+        // 2) 매물
+        const all = await getListings();
+        setListings(all);
+      } catch {}
+    })();
+  }, [isLoggedIn, email]);
+
+  const regionListings: ListingListItem[] = useMemo(() => {
+    if (!favRegions || favRegions.length === 0) return [];
+    return listings.filter(l => favRegions.some(r => (l.addr || '').includes(r)));
+  }, [favRegions, listings]);
+
+  // 2초 자동 슬라이드 (매물 2개 이상)
+  useEffect(() => {
+    if (regionListings.length <= 1 || paused) return;
+    const t = setInterval(() => setCur((i) => (i + 1) % regionListings.length), 2000);
+    return () => clearInterval(t);
+  }, [regionListings.length, paused]);
 
   // 새로운 홈페이지 기능
   const handlePlusClick = () => {
@@ -49,7 +90,7 @@ export default function Home() {
             <SectionContainer>
               {/* 상단 네비와 중복되는 컨텐츠 헤더 제거 */}
 
-              <GreetingCard>
+              <GreetingCard onClick={() => router.push('/mypage')}>
                 <GreetingAvatar />
                 <div>
                   <GreetingText>
@@ -60,12 +101,27 @@ export default function Home() {
                     )}
                   </GreetingText>
                   {isLoggedIn && (
-                    <GreetingProgress>
+                    <TagRow>
+                      <TagLabel>희망 이주지</TagLabel>
+                      <TagChips>
+                        {(favRegions.length ? favRegions : ['지역 설정 없음']).slice(0,3).map((r) => (
+                          <Tag key={r}>#{r}</Tag>
+                        ))}
+                      </TagChips>
+                    </TagRow>
+                  )}
+                  {isLoggedIn && (
+                    <ProgressWrap>
                       <GreetingBar>
-                        <GreetingFill style={{ width: '57%' }} />
+                        <GreetingFill style={{ width: `${progressMock}%` }} />
                       </GreetingBar>
-                      <GreetingPercent>57%</GreetingPercent>
-                    </GreetingProgress>
+                      <StageRow>
+                        <StageLabel $active>탐색</StageLabel>
+                        <StageLabel>정주</StageLabel>
+                        <StageLabel>정주</StageLabel>
+                        <StageLabel>정주</StageLabel>
+                      </StageRow>
+                    </ProgressWrap>
                   )}
                 </div>
               </GreetingCard>
@@ -73,17 +129,32 @@ export default function Home() {
               {isLoggedIn ? (
                 <>
                   <HeadingRow>
-                    <SectionTitleAlt>{userName}님을 위한 이주메이트</SectionTitleAlt>
+                    <SectionTitleAlt>{userName}님을 위한 보금자리</SectionTitleAlt>
                     <Chevron>›</Chevron>
                   </HeadingRow>
-                  <RecommendHorizontal>
-                    <RecommendImg />
-                    <div>
-                      <RecommendName>전북 무주군 무주읍 적천로 343</RecommendName>
-                      <RecommendPrice>전세 2000/90</RecommendPrice>
-                      <RecommendCTA>자세히 보기</RecommendCTA>
-                    </div>
-                  </RecommendHorizontal>
+                  {regionListings.length === 0 ? (
+                    <EmptyCard onClick={() => router.push('/properties')}>
+                      <EmptyPlus>+</EmptyPlus>
+                      <EmptyText>이사가실 집을 찾아보세요!</EmptyText>
+                    </EmptyCard>
+                  ) : (
+                    <RecommendHorizontal
+                      key={cur}
+                      $hold={paused}
+                      onMouseEnter={() => setPaused(true)}
+                      onMouseLeave={() => setPaused(false)}
+                      onTouchStart={() => setPaused(true)}
+                      onTouchEnd={() => setPaused(false)}
+                      onClick={() => router.push(`/properties/${regionListings[cur].id}`)}
+                    >
+                      <RecommendImg />
+                      <div>
+                        <RecommendName>{regionListings[cur].addr}</RecommendName>
+                        <RecommendPrice>{regionListings[cur].title || regionListings[cur].price}</RecommendPrice>
+                        <RecommendCTA>자세히 보기</RecommendCTA>
+                      </div>
+                    </RecommendHorizontal>
+                  )}
                 </>
               ) : (
                 <LoginPromptSection>
@@ -364,7 +435,10 @@ const SectionContainer = styled.section`
 /* 중복 헤더 컴포넌트 삭제 */
 const GreetingCard = styled.div`
   background: #fff; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  padding: 16px; display: flex; gap: 16px; align-items: center; margin-bottom: 16px;
+  padding: 16px; display: flex; gap: 16px; align-items: center; margin-bottom: 16px; cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease;
+  &:hover { transform: scale(1.02); box-shadow: 0 8px 16px rgba(0,0,0,0.12); }
+  &:active { transform: scale(1.02); box-shadow: 0 10px 18px rgba(0,0,0,0.14); }
 `;
 const GreetingAvatar = styled.div`
   width: 74px; height: 74px; border-radius: 50%; background: #E6F0F8;
@@ -379,7 +453,7 @@ const GreetingContent = styled.div`
   flex: 1;
 `;
 const GreetingBar = styled.div`
-  width: 50%; height: 12px; background: #EEEDED; border-radius: 5px; overflow: hidden;
+  width: 100%; height: 12px; background: #EEEDED; border-radius: 5px; overflow: hidden;
 `;
 const GreetingFill = styled.div`
   height: 100%; background: #3394E2;
@@ -387,12 +461,47 @@ const GreetingFill = styled.div`
 const GreetingPercent = styled.span`
   font-size: 18px; font-weight: 500; color: #737373;
 `;
+const ProgressWrap = styled.div`
+  margin-top: 12px;
+`;
+const StageRow = styled.div`
+  display: flex; justify-content: space-between; margin-top: 8px; align-items:center; width:100%;
+`;
+const StageLabel = styled.span<{ $active?: boolean }>`
+  text-align: center; font-size: 15px; font-weight: 700; color: ${(p)=>p.$active?'#111':'#9ca3af'};
+`;
+const TagRow = styled.div`
+  display:flex; align-items:center; gap:12px; margin-top:8px;
+`;
+const TagLabel = styled.div`
+  font-size:14px; font-weight:700; color:#737373;
+`;
+const TagChips = styled.div`
+  display:flex; flex-wrap:wrap; gap:8px;
+`;
+const Tag = styled.span`
+  display:inline-block; padding:6px 10px; border-radius:10px; background:#f3f4f6; color:#374151; font-size:13px; font-weight:700;
+`;
 const SectionTitleAlt = styled.h3`
   font-size: 20px; font-weight: 500; color: #000; margin: 12px 0;
 `;
-const RecommendHorizontal = styled.div`
+const slideInRight = keyframes`
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+`;
+
+const holdPulse = keyframes`
+  from { transform: translateX(0) scale(1); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+  to   { transform: translateX(0) scale(1.02); box-shadow: 0 8px 16px rgba(0,0,0,0.12); }
+`;
+
+const RecommendHorizontal = styled.div<{$hold?: boolean}>`
   display: grid; grid-template-columns: 114px 1fr; gap: 16px; align-items: center;
   background: #fff; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 16px;
+  animation: ${slideInRight} .35s ease;
+  ${(p)=> p.$hold && css`animation: ${slideInRight} .35s ease, ${holdPulse} .9s ease-in-out infinite alternate;`}
+  transition: transform .2s ease, box-shadow .2s ease;
+  &:hover { transform: translateX(0) scale(1.02); box-shadow: 0 8px 16px rgba(0,0,0,0.12); }
 `;
 const RecommendImg = styled.div`
   width: 114px; height: 114px; background: #d9d9d9; border-radius: 10px;
@@ -406,6 +515,16 @@ const RecommendPrice = styled.div`
 const RecommendCTA = styled.button`
   margin-top: 8px; width: 136px; height: 41px; border-radius: 10px; background: #fff; border: 1px solid #BFBFBF; color: #353535;
 `;
+
+const EmptyCard = styled.button`
+  width: 100%; background:#fff; border-radius: 16px; padding: 28px 20px; border:1px solid #e5e7eb; display:flex; flex-direction:column; align-items:center; gap:18px; box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+`;
+const EmptyPlus = styled.div`
+  width: 96px; height: 96px; border-radius: 50%; background: #e9f2fb; color:#2F80ED; display:grid; place-items:center; font-size:48px; font-weight:800;
+`;
+const EmptyText = styled.div`
+  font-size: 18px; color:#111; font-weight:700;
+`;
 const HeadingRow = styled.div`
   display:flex; align-items:center; justify-content:space-between; margin: 16px 0 8px;
 `;
@@ -417,7 +536,10 @@ const TwoGrid = styled.div`
 `;
 const PartnerBox = styled.div`
   background: #fff; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 24px; min-height: 132px;
-  display: flex; align-items: center;
+  display: flex; align-items: center; cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease;
+  &:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,0.12); }
+  &:active { transform: translateY(-1px); box-shadow: 0 10px 18px rgba(0,0,0,0.14); }
 `;
 const PartnerText = styled.div`
   font-size: 16px; font-weight: 600; color: #000; line-height: 1.3;
@@ -427,7 +549,10 @@ const StackedList = styled.div`
 `;
 const InfoRow = styled.div`
   display: grid; grid-template-columns: 73px 1fr 80px; gap: 16px; align-items: center; background: #fff;
-  border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 16px;
+  border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 16px; cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease;
+  &:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,0.12); }
+  &:active { transform: translateY(-1px); box-shadow: 0 10px 18px rgba(0,0,0,0.14); }
 `;
 const InfoSquare = styled.div`
   width: 73px; height: 73px; border-radius: 10px;

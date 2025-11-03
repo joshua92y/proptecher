@@ -33,6 +33,9 @@ export default function ListingsPage() {
   const [modalHeight, setModalHeight] = useState(30); // 모달 높이 (%)
   const [isDragging, setIsDragging] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showFavDropdown, setShowFavDropdown] = useState(false);
+  const [favRegions, setFavRegions] = useState<string[]>([]);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const dragStartY = useRef<number>(0);
   const dragStartHeight = useRef<number>(30);
   const lastMoveAt = useRef<number>(0);
@@ -226,11 +229,58 @@ export default function ListingsPage() {
         {/* 관심 지역 매물 보기 버튼 */}
         <FavButton 
           $navVisible={showTopNav}
-          onClick={(e) => { e.stopPropagation(); alert('관심 지역 기능은 목업입니다'); }}
+          onClick={async (e) => { 
+            e.stopPropagation(); 
+            try {
+              const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
+              if (!email) { setToastMsg('로그인이 필요합니다'); setTimeout(()=>setToastMsg(null), 1400); return; }
+              const API_BASE = process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+              const res = await fetch(`${API_BASE}/api/users/preferences?email=${encodeURIComponent(email)}`);
+              const data = await res.json();
+              const regions: string[] = Array.isArray(data.preferred_regions) ? data.preferred_regions : [];
+              if (regions.length === 0) {
+                setToastMsg('관심지역이 설정되지 않았습니다. 관심지역을 설정해주세요');
+                setTimeout(()=>setToastMsg(null), 1400);
+                setShowFavDropdown(false);
+              } else if (regions.length === 1) {
+                const matches = allListings.filter(l => (l.addr||'').includes(regions[0]));
+                if (matches.length > 0) {
+                  window.dispatchEvent(new CustomEvent('fitBounds', { detail: matches.map(m => ({ lat: m.lat, lng: m.lng })) }));
+                } else {
+                  window.dispatchEvent(new CustomEvent('focusRegion', { detail: regions[0] }));
+                }
+                setShowFavDropdown(false);
+              } else {
+                setFavRegions(regions);
+                setShowFavDropdown(v => !v);
+              }
+            } catch {
+              setToastMsg('관심지역 정보를 불러오지 못했습니다');
+              setTimeout(()=>setToastMsg(null), 1400);
+            }
+          }}
         >
           <FavIcon>⭐</FavIcon>
           관심 지역 매물 보기
         </FavButton>
+        {showFavDropdown && (
+          <FavDropdown $navVisible={showTopNav} onClick={(e)=>e.stopPropagation()}>
+            <FavTitle>관심 지역 선택</FavTitle>
+            <FavList>
+              {favRegions.map((r)=> (
+                <FavItem key={r} onClick={()=>{ 
+                  const matches = allListings.filter(l => (l.addr||'').includes(r));
+                  if (matches.length > 0) {
+                    window.dispatchEvent(new CustomEvent('fitBounds', { detail: matches.map(m => ({ lat: m.lat, lng: m.lng })) }));
+                  } else {
+                    window.dispatchEvent(new CustomEvent('focusRegion', { detail: r }));
+                  }
+                  setShowFavDropdown(false); 
+                }}>{r}</FavItem>
+              ))}
+            </FavList>
+          </FavDropdown>
+        )}
         {/* 현재 위치 버튼 */}
         <LocateBtn onClick={(e)=>{ e.stopPropagation(); /* TODO: geolocation */ }}>
           ⊕
@@ -316,6 +366,7 @@ export default function ListingsPage() {
           <NavLabel>MY</NavLabel>
         </BottomNavItem>
       </BottomNavCustom>
+      {toastMsg && (<Toast>{toastMsg}</Toast>)}
     </Wrap>
     </>
   );
@@ -361,10 +412,41 @@ const FavIcon = styled.span`
   color: #f59e0b; font-size: 18px;
 `;
 
+const FavDropdown = styled.div<{ $navVisible: boolean }>`
+  position: absolute;
+  top: ${(p) => (p.$navVisible ? '124px' : '64px')};
+  left: 16px;
+  z-index: 3;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 8px 18px rgba(0,0,0,.08);
+  width: 220px;
+  overflow: hidden;
+`;
+
+const FavTitle = styled.div`
+  padding: 10px 12px; font-size: 12px; color:#6a6969; font-weight:700; border-bottom:1px solid #f0f0f0;
+`;
+
+const FavList = styled.ul`
+  list-style:none; margin:0; padding:6px;
+`;
+
+const FavItem = styled.li`
+  padding: 10px 10px; border-radius:10px; cursor:pointer; font-size:14px; font-weight:700; color:#111;
+  &:hover { background:#f8f8ff; }
+`;
+
 const LocateBtn = styled.button`
   position: absolute; right: 16px; bottom: 100px; z-index: 2;
   width: 56px; height: 56px; border-radius: 16px; border: none; background: #2F80ED; color: #fff; font-size: 22px; font-weight: 800;
   box-shadow: 0 8px 18px rgba(47,128,237,.35);
+`;
+
+const Toast = styled.div`
+  position: fixed; left:50%; transform: translateX(-50%);
+  top: 16px; z-index: 5000; background: rgba(0,0,0,0.8); color:#fff; padding: 10px 14px; border-radius: 999px; font-size: 12px; font-weight: 700;
 `;
 
 // 커스텀 상단바

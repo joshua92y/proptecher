@@ -40,10 +40,10 @@ export default function MyPage() {
 
   const menuItems = [
     { id: "inspections", label: "내 임장보고서", icon: "📋", path: "/mypage/inspections" },
-    { id: "profile", label: "프로필 수정", icon: "✏️", path: "" },
+    { id: "preferences", label: "관심지역/귀촌목적", icon: "📍", path: "/mypage/preferences" },
     { id: "favorites", label: "관심 매물", icon: "❤️", path: "" },
     { id: "history", label: "최근 본 매물", icon: "👁️", path: "" },
-    { id: "inquiries", label: "문의 내역", icon: "💬", path: "" },
+    { id: "profile", label: "프로필 수정", icon: "✏️", path: "" },
     { id: "settings", label: "설정", icon: "⚙️", path: "" },
   ];
 
@@ -62,6 +62,7 @@ export default function MyPage() {
         </ProfileSection>
 
         <MenuSection>
+          <MenuHeader>내 정보 설정</MenuHeader>
           {menuItems.map((item) => (
             <MenuItem
               key={item.id}
@@ -129,9 +130,9 @@ const ProfileEmail = styled.p`
 const LoginButton = styled.button`
   padding: 12px 32px;
   border-radius: 8px;
-  border: 1px solid #6e39ff;
+  border: 1px solid #844df3;
   background: #fff;
-  color: #6e39ff;
+  color: #844df3;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -144,8 +145,8 @@ const LoginButton = styled.button`
 const ProfileStatus = styled.div`
   padding: 12px 32px;
   border-radius: 8px;
-  background: #e8f5e8;
-  color: #2e7d2e;
+  background: #f3f1ff;
+  color: #844df3;
   font-size: 14px;
   font-weight: 600;
   text-align: center;
@@ -154,6 +155,11 @@ const ProfileStatus = styled.div`
 const MenuSection = styled.div`
   background: #fff;
   margin-bottom: 8px;
+`;
+
+const MenuHeader = styled.h3`
+  margin: 0; padding: 14px 20px; font-size: 14px; color: #6a6969; font-weight: 700;
+  border-bottom: 1px solid #f5f5f5;
 `;
 
 const MenuItem = styled.button`

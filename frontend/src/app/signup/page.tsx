@@ -51,7 +51,7 @@ export default function SignupWizardPage() {
     [reasons]
   );
 
-  const goNext = () => setStep((s) => Math.min(5, s + 1));
+  const goNext = () => setStep((s) => Math.min(7, s + 1));
   const goPrev = () => setStep((s) => Math.max(0, s - 1));
 
   useEffect(() => {
@@ -219,15 +219,21 @@ export default function SignupWizardPage() {
 
         {step === 5 && (
           <StepCard>
-            <StepTitle>관심 지역을 선택해주세요 (선택)</StepTitle>
+            <StepTitle>관심 지역을 선택해주세요 (최대 3개)</StepTitle>
             <StepHint>여러 개 선택 가능, 스킵 가능</StepHint>
             <ReasonList>
-              {["서울","경기","인천","강원","충북","충남","전북","전남","경북","경남","부산","대구","광주","대전","울산","제주"].map((n)=> (
-                <ReasonItem key={n} $active={preferredRegions.includes(n)} onClick={()=> setPreferredRegions((prev)=> prev.includes(n)? prev.filter(x=>x!==n):[...prev,n])}>{n}</ReasonItem>
-              ))}
+              {["서울","경기","인천","강원","충북","충남","전북","전남","경북","경남","부산","대구","광주","대전","울산","제주"].map((n)=> {
+                const isActive = preferredRegions.includes(n);
+                const canAdd = isActive || preferredRegions.length < 3;
+                return (
+                  <ReasonItem key={n} $active={isActive} disabled={!canAdd}
+                    onClick={()=> setPreferredRegions((prev)=> prev.includes(n)? prev.filter(x=>x!==n): (prev.length<3?[...prev,n]:prev))}
+                  >{n}</ReasonItem>
+                );
+              })}
             </ReasonList>
             <ButtonRow>
-              <GhostButton onClick={goPrev}>이전</GhostButton>
+              <GhostButton onClick={goNext}>스킵</GhostButton>
               <PrimaryButton onClick={goNext}>다음으로</PrimaryButton>
             </ButtonRow>
           </StepCard>
@@ -400,6 +406,7 @@ const ReasonItem = styled.button<{ $active: boolean }>`
   width: 100%; padding: 22px 18px; border-radius: 16px; text-align: left; font-size: 18px; color: #111; background: #fff; border: 1.5px solid ${(p) => (p.$active ? PRIMARY : '#e5e7eb')};
   box-shadow: 0 2px 6px rgba(0,0,0,0.04); cursor: pointer;
   background-color: ${(p) => (p.$active ? '#F5FAFF' : '#fff')};
+  &:disabled { opacity: .5; cursor: not-allowed; }
 `;
 
 const UserTypeGrid = styled.div`

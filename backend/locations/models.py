@@ -130,3 +130,63 @@ class Region(models.Model):
     def __str__(self):
         return f"{self.시도} {self.시군구} {self.읍면동}"
 
+
+class SubwayStation(models.Model):
+    """
+    지하철역 모델
+    """
+    id = models.AutoField(primary_key=True)
+    역코드 = models.CharField(
+        max_length=30,
+        null=True,
+        blank=True,
+        unique=True,
+        verbose_name='역 코드'
+    )
+    역명 = models.CharField(
+        max_length=100,
+        verbose_name='역 이름'
+    )
+    노선명 = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name='노선명(콤마구분)'
+    )
+    위치 = models.PointField(
+        srid=4326,
+        null=True,
+        blank=True,
+        verbose_name='역 위치'
+    )
+    주소 = models.CharField(
+        max_length=200,
+        null=True,
+        blank=True,
+        verbose_name='주소'
+    )
+    시도 = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        verbose_name='시도'
+    )
+    시군구 = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        verbose_name='시군구'
+    )
+
+    class Meta:
+        verbose_name = '지하철역'
+        verbose_name_plural = '지하철역'
+        db_table = 'subway_stations'
+        indexes = [
+            models.Index(fields=['역명']),
+            models.Index(fields=['노선명']),
+        ]
+
+    def __str__(self):
+        code = f"[{self.역코드}] " if self.역코드 else ""
+        return f"{code}{self.역명}"

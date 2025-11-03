@@ -101,7 +101,11 @@ const toCurrencyShort = (n: number) => {
   return `${n.toLocaleString()}원`;
 };
 
-const mToText = (m: number | null) => (m == null ? null : `${m}m`);
+const mToText = (m: number | null) => {
+  if (m == null) return null;
+  const minutes = Math.max(1, Math.round(m / 80));
+  return `${m}m · ${minutes}분`;
+};
 
 const formatDateDot = (iso: string | null | undefined): string | null => {
   if (!iso) return null;
@@ -229,12 +233,12 @@ export function toVM(api: ApiListing): ListingDetailVM {
           convenience: api.public_transport_score,
           diversity: api.line_variety_score,
         },
-        busStops: api.bus_stops.map((b) => ({
+        busStops: (api.bus_stops ?? []).map((b) => ({
           name: b.stop_name,
           distance: mToText(b.distance_m),
           lines: b.bus_numbers ?? [],
         })),
-        subways: api.stations.map((s) => ({
+        subways: (api.stations ?? []).map((s) => ({
           name: s.station_name,
           distance: mToText(s.distance_m),
           lines: s.line_names ?? [],
@@ -342,12 +346,41 @@ export async function getListingDetailVM(id: string): Promise<ListingDetailVM | 
     const res = await fetch(`${apiUrl}/api/properties/${id}/`, { cache: "no-store" });
     if (!res.ok) throw new Error("bad status");
     const json: ApiListing = await res.json();
-    return toVM(json);
+    const base = toVM(json);
+
+    // 근접 교통 데이터(반경 1km) 보강
+    try {
+      const nearRes = await fetch(`${apiUrl}/api/properties/${id}/nearby/?radius_m=1000`, { cache: 'no-store' });
+      if (nearRes.ok) {
+        const nearJson: any = await nearRes.json();
+        const busStops = Array.isArray(nearJson.bus_stops)
+          ? nearJson.bus_stops.map((b: any) => ({
+              name: b.stop_name,
+              distance: mToText(typeof b.distance_m === 'string' ? parseFloat(b.distance_m) : b.distance_m),
+              lines: Array.isArray(b.bus_numbers) ? b.bus_numbers : [],
+            }))
+          : [];
+        const subways = Array.isArray(nearJson.stations)
+          ? nearJson.stations.map((s: any) => ({
+              name: s.station_name,
+              distance: mToText(typeof s.distance_m === 'string' ? parseFloat(s.distance_m) : s.distance_m),
+              lines: Array.isArray(s.line_names) ? s.line_names : [],
+            }))
+          : [];
+
+        base.env.traffic.busStops = busStops;
+        base.env.traffic.subways = subways;
+      }
+    } catch (e) {
+      // 근접 데이터 실패 시 무시하고 기본 VM만 반환
+    }
+
+    return base;
   } catch (error) {
     console.error('Failed to fetch property detail from API:', error);
     // 폴백(mock) — 개발 편의용
     const mock: ApiListing = {
-      listing_type: "jeonse",
+      listing_type: "전세",
       jeonse_price: 320_000_000,
 
       address: "서울특별시 강남구 테헤란로 123",
